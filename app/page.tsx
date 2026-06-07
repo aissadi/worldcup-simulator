@@ -1,30 +1,51 @@
 "use client";
 
-import { Maximize2, Minimize2, RotateCcw, Share2, Shuffle, Trophy, Tv } from "lucide-react";
+import { Crown, Maximize2, Minimize2, RotateCcw, Share2, Shuffle, Sparkles, Trophy, Users, Zap } from "lucide-react";
 import { useMemo, useState } from "react";
 
-type Team = { name: string; rating: number; group: string };
+type Mode = "simulation" | "manual";
+type Team = { name: string; rating: number; group: string; flag: string };
 type Group = { id: string; teams: Team[] };
 type Standing = Team & { played: number; won: number; drawn: number; lost: number; gf: number; ga: number; gd: number; points: number };
-type Match = { id: number; home: string; away: string; homeSource: string; awaySource: string; hs: number; as: number; winner: string; label: string };
 type Slot = { source: string; team: string };
+type Match = { id: number; home: string; away: string; homeSource: string; awaySource: string; hs?: number; as?: number; winner?: string; label: string };
+type Round = { name: string; matches: Match[] };
 
-const groups: Group[] = [
-  { id: "A", teams: [["Mexico", 82], ["South Africa", 75], ["South Korea", 80], ["Czechia", 79]].map(([name, rating]) => ({ name: name as string, rating: rating as number, group: "A" })) },
-  { id: "B", teams: [["Canada", 79], ["Bosnia and Herzegovina", 78], ["Qatar", 76], ["Switzerland", 83]].map(([name, rating]) => ({ name: name as string, rating: rating as number, group: "B" })) },
-  { id: "C", teams: [["Brazil", 90], ["Morocco", 84], ["Haiti", 70], ["Scotland", 79]].map(([name, rating]) => ({ name: name as string, rating: rating as number, group: "C" })) },
-  { id: "D", teams: [["United States", 81], ["Paraguay", 78], ["Türkiye", 80], ["Australia", 77]].map(([name, rating]) => ({ name: name as string, rating: rating as number, group: "D" })) },
-  { id: "E", teams: [["Germany", 87], ["Curaçao", 70], ["Ecuador", 82], ["Ivory Coast", 80]].map(([name, rating]) => ({ name: name as string, rating: rating as number, group: "E" })) },
-  { id: "F", teams: [["Netherlands", 88], ["Japan", 83], ["Sweden", 81], ["Tunisia", 77]].map(([name, rating]) => ({ name: name as string, rating: rating as number, group: "F" })) },
-  { id: "G", teams: [["Belgium", 86], ["Egypt", 81], ["Iran", 78], ["New Zealand", 72]].map(([name, rating]) => ({ name: name as string, rating: rating as number, group: "G" })) },
-  { id: "H", teams: [["Spain", 91], ["Saudi Arabia", 76], ["Uruguay", 86], ["Cape Verde", 72]].map(([name, rating]) => ({ name: name as string, rating: rating as number, group: "H" })) },
-  { id: "I", teams: [["France", 91], ["Senegal", 82], ["Norway", 83], ["Iraq", 74]].map(([name, rating]) => ({ name: name as string, rating: rating as number, group: "I" })) },
-  { id: "J", teams: [["Argentina", 91], ["Algeria", 80], ["Austria", 82], ["Jordan", 71]].map(([name, rating]) => ({ name: name as string, rating: rating as number, group: "J" })) },
-  { id: "K", teams: [["Portugal", 89], ["DR Congo", 76], ["Uzbekistan", 74], ["Colombia", 84]].map(([name, rating]) => ({ name: name as string, rating: rating as number, group: "K" })) },
-  { id: "L", teams: [["England", 89], ["Ghana", 78], ["Croatia", 84], ["Panama", 73]].map(([name, rating]) => ({ name: name as string, rating: rating as number, group: "L" })) }
+const flags: Record<string, string> = {
+  "Mexico": "🇲🇽", "South Africa": "🇿🇦", "South Korea": "🇰🇷", "Czechia": "🇨🇿",
+  "Canada": "🇨🇦", "Bosnia and Herzegovina": "🇧🇦", "Qatar": "🇶🇦", "Switzerland": "🇨🇭",
+  "Brazil": "🇧🇷", "Morocco": "🇲🇦", "Haiti": "🇭🇹", "Scotland": "🏴",
+  "United States": "🇺🇸", "Paraguay": "🇵🇾", "Türkiye": "🇹🇷", "Australia": "🇦🇺",
+  "Germany": "🇩🇪", "Curaçao": "🇨🇼", "Ecuador": "🇪🇨", "Ivory Coast": "🇨🇮",
+  "Netherlands": "🇳🇱", "Japan": "🇯🇵", "Sweden": "🇸🇪", "Tunisia": "🇹🇳",
+  "Belgium": "🇧🇪", "Egypt": "🇪🇬", "Iran": "🇮🇷", "New Zealand": "🇳🇿",
+  "Spain": "🇪🇸", "Saudi Arabia": "🇸🇦", "Uruguay": "🇺🇾", "Cape Verde": "🇨🇻",
+  "France": "🇫🇷", "Senegal": "🇸🇳", "Norway": "🇳🇴", "Iraq": "🇮🇶",
+  "Argentina": "🇦🇷", "Algeria": "🇩🇿", "Austria": "🇦🇹", "Jordan": "🇯🇴",
+  "Portugal": "🇵🇹", "DR Congo": "🇨🇩", "Uzbekistan": "🇺🇿", "Colombia": "🇨🇴",
+  "England": "🏴", "Ghana": "🇬🇭", "Croatia": "🇭🇷", "Panama": "🇵🇦"
+};
+
+const groupSeed: Array<[string, Array<[string, number]>]> = [
+  ["A", [["Mexico", 82], ["South Africa", 75], ["South Korea", 80], ["Czechia", 79]]],
+  ["B", [["Canada", 79], ["Bosnia and Herzegovina", 78], ["Qatar", 76], ["Switzerland", 83]]],
+  ["C", [["Brazil", 90], ["Morocco", 84], ["Haiti", 70], ["Scotland", 79]]],
+  ["D", [["United States", 81], ["Paraguay", 78], ["Türkiye", 80], ["Australia", 77]]],
+  ["E", [["Germany", 87], ["Curaçao", 70], ["Ecuador", 82], ["Ivory Coast", 80]]],
+  ["F", [["Netherlands", 88], ["Japan", 83], ["Sweden", 81], ["Tunisia", 77]]],
+  ["G", [["Belgium", 86], ["Egypt", 81], ["Iran", 78], ["New Zealand", 72]]],
+  ["H", [["Spain", 91], ["Saudi Arabia", 76], ["Uruguay", 86], ["Cape Verde", 72]]],
+  ["I", [["France", 91], ["Senegal", 82], ["Norway", 83], ["Iraq", 74]]],
+  ["J", [["Argentina", 91], ["Algeria", 80], ["Austria", 82], ["Jordan", 71]]],
+  ["K", [["Portugal", 89], ["DR Congo", 76], ["Uzbekistan", 74], ["Colombia", 84]]],
+  ["L", [["England", 89], ["Ghana", 78], ["Croatia", 84], ["Panama", 73]]]
 ];
 
-// Round of 32 pairings follow the official FIFA knockout structure.
+const groups: Group[] = groupSeed.map(([id, teams]) => ({
+  id,
+  teams: teams.map(([name, rating]) => ({ name, rating, group: id, flag: flags[name] ?? "🏳️" }))
+}));
+
 const fixedR32 = [
   [73, "2A", "2B"], [74, "1C", "2F"], [75, "1E", "3ABCDF"], [76, "1F", "2C"],
   [77, "2E", "2I"], [78, "1I", "3CDFGH"], [79, "1A", "3CEFHI"], [80, "1L", "3EHIJK"],
@@ -40,6 +61,7 @@ const nextRounds = [
 ] as const;
 
 const groupFixtures = [[0, 1], [2, 3], [0, 2], [1, 3], [0, 3], [1, 2]];
+const roundNames = ["Round of 32", "Round of 16", "Quarterfinals", "Semifinals", "Third Place Match", "Final"] as const;
 
 function rngFrom(seed: number) {
   let value = seed >>> 0;
@@ -58,9 +80,7 @@ function goals(rating: number, opponent: number, rng: () => number) {
 }
 
 function decide(home: Team, away: Team, rng: () => number) {
-  const hs = goals(home.rating, away.rating, rng);
-  const as = goals(away.rating, home.rating, rng);
-  return { hs, as };
+  return { hs: goals(home.rating, away.rating, rng), as: goals(away.rating, home.rating, rng) };
 }
 
 function knockout(home: Slot, away: Slot, teams: Map<string, Team>, id: number, rng: () => number): Match {
@@ -83,10 +103,7 @@ function assignThirdPlaceSlots(bestThirds: Standing[]) {
   const thirdSlots = fixedR32
     .flatMap(([, home, away]) => [home, away])
     .filter((code) => code.startsWith("3") && code.length > 2)
-    .map((code) => ({
-      code,
-      candidates: code.slice(1).split("").filter((group) => thirdGroups.has(group))
-    }))
+    .map((code) => ({ code, candidates: code.slice(1).split("").filter((group) => thirdGroups.has(group)) }))
     .sort((a, b) => a.candidates.length - b.candidates.length);
   const teamByGroup = new Map(bestThirds.map((team) => [team.group, team]));
   const assigned = new Map<string, Standing>();
@@ -137,7 +154,7 @@ function simulate(seed: number) {
       else if (as > hs) { ar.won++; hr.lost++; ar.points += 3; }
       else { hr.drawn++; ar.drawn++; hr.points++; ar.points++; }
       hr.gd = hr.gf - hr.ga; ar.gd = ar.gf - ar.ga;
-      return `${home.name} ${hs}-${as} ${away.name}`;
+      return `${home.flag} ${home.name} ${hs}-${as} ${away.name} ${away.flag}`;
     });
     const standings = [...rows.values()].sort((a, b) => b.points - a.points || b.gd - a.gd || b.gf - a.gf || b.rating - a.rating);
     return { group: group.id, standings, matches };
@@ -152,106 +169,331 @@ function simulate(seed: number) {
 
   const bestThirds = tables.map((t) => t.standings[2]).sort((a, b) => b.points - a.points || b.gd - a.gd || b.gf - a.gf || b.rating - a.rating).slice(0, 8);
   const thirdAssignments = assignThirdPlaceSlots(bestThirds);
-  const chooseThird = (code: string) => {
-    const picked = thirdAssignments.get(code)!;
-    return { source: `3${picked.group}`, team: picked.name };
+  const resolve = (code: string) => {
+    if (code.startsWith("3") && code.length > 2) {
+      const picked = thirdAssignments.get(code)!;
+      return { source: `3${picked.group}`, team: picked.name };
+    }
+    return slots.get(code)!;
   };
-  const resolve = (code: string) => code.startsWith("3") && code.length > 2 ? chooseThird(code) : slots.get(code)!;
 
   const matches = new Map<number, Match>();
   fixedR32.forEach(([id, a, b]) => matches.set(id, knockout(resolve(a), resolve(b), teams, id, rng)));
   nextRounds.forEach(([id, a, b]) => {
-    const semiPairing = id === 103;
-    const home = { source: `${semiPairing ? "L" : "W"}${a}`, team: semiPairing ? loser(matches.get(a)!) : matches.get(a)!.winner };
-    const away = { source: `${semiPairing ? "L" : "W"}${b}`, team: semiPairing ? loser(matches.get(b)!) : matches.get(b)!.winner };
+    const isThirdPlace = id === 103;
+    const ma = matches.get(a)!;
+    const mb = matches.get(b)!;
+    const home = { source: `${isThirdPlace ? "L" : "W"}${a}`, team: isThirdPlace ? loser(ma) : ma.winner! };
+    const away = { source: `${isThirdPlace ? "L" : "W"}${b}`, team: isThirdPlace ? loser(mb) : mb.winner! };
     matches.set(id, knockout(home, away, teams, id, rng));
   });
 
-  return { tables, bestThirds, matches: [...matches.values()].sort((a, b) => a.id - b.id), champion: matches.get(104)!.winner };
+  return { tables, bestThirds, matches: [...matches.values()].sort((a, b) => a.id - b.id), champion: matches.get(104)!.winner! };
+}
+
+function blankMatch(id: number, homeSource: string, awaySource: string, home = "", away = ""): Match {
+  return { id, home, away, homeSource, awaySource, label: `M${id}` };
+}
+
+function isPlaceholderTeam(team: string) {
+  return team === "Qualified team" || team.startsWith("Winner M") || team.startsWith("Loser M");
+}
+
+function roundFor(matchId: number) {
+  if (matchId <= 88) return 0;
+  if (matchId <= 96) return 1;
+  if (matchId <= 100) return 2;
+  if (matchId <= 102) return 3;
+  if (matchId === 103) return 4;
+  return 5;
+}
+
+function groupRounds(matches: Match[]): Round[] {
+  return roundNames.map((name, index) => ({ name, matches: matches.filter((match) => roundFor(match.id) === index) }));
+}
+
+function buildProgressMatches(autoMatches: Match[], revealed: Set<number>, allGroupsRevealed: boolean) {
+  const autoById = new Map(autoMatches.map((match) => [match.id, match]));
+  const visible = new Map<number, Match>();
+
+  fixedR32.forEach(([id]) => {
+    const match = autoById.get(id)!;
+    visible.set(id, allGroupsRevealed ? { ...match, winner: revealed.has(id) ? match.winner : undefined, hs: revealed.has(id) ? match.hs : undefined, as: revealed.has(id) ? match.as : undefined } : blankMatch(id, "Qual.", "Qual.", "Qualified team", "Qualified team"));
+  });
+
+  nextRounds.forEach(([id, a, b]) => {
+    const auto = autoById.get(id)!;
+    const isThirdPlace = id === 103;
+    const leftReady = revealed.has(a);
+    const rightReady = revealed.has(b);
+    const homeTeam = leftReady ? (isThirdPlace ? loser(autoById.get(a)!) : autoById.get(a)!.winner!) : `${isThirdPlace ? "Loser" : "Winner"} M${a}`;
+    const awayTeam = rightReady ? (isThirdPlace ? loser(autoById.get(b)!) : autoById.get(b)!.winner!) : `${isThirdPlace ? "Loser" : "Winner"} M${b}`;
+    const complete = revealed.has(id);
+    visible.set(id, { ...auto, home: homeTeam, away: awayTeam, homeSource: `${isThirdPlace ? "L" : "W"}${a}`, awaySource: `${isThirdPlace ? "L" : "W"}${b}`, winner: complete ? auto.winner : undefined, hs: complete ? auto.hs : undefined, as: complete ? auto.as : undefined });
+  });
+
+  return [...visible.values()].sort((a, b) => a.id - b.id);
+}
+
+function buildManualMatches(baseMatches: Match[], picks: Record<number, string>, allGroupsRevealed: boolean) {
+  const base = new Map(baseMatches.map((match) => [match.id, match]));
+  const matches = new Map<number, Match>();
+
+  fixedR32.forEach(([id]) => {
+    const match = base.get(id)!;
+    matches.set(id, allGroupsRevealed ? { ...match, hs: undefined, as: undefined, winner: picks[id] } : blankMatch(id, "Qual.", "Qual.", "Qualified team", "Qualified team"));
+  });
+
+  nextRounds.forEach(([id, a, b]) => {
+    const isThirdPlace = id === 103;
+    const prevA = matches.get(a)!;
+    const prevB = matches.get(b)!;
+    const home = isThirdPlace
+      ? prevA.winner ? (prevA.winner === prevA.home ? prevA.away : prevA.home) : `Loser M${a}`
+      : prevA.winner ?? `Winner M${a}`;
+    const away = isThirdPlace
+      ? prevB.winner ? (prevB.winner === prevB.home ? prevB.away : prevB.home) : `Loser M${b}`
+      : prevB.winner ?? `Winner M${b}`;
+    const ready = !isPlaceholderTeam(home) && !isPlaceholderTeam(away);
+    matches.set(id, { id, home, away, homeSource: `${isThirdPlace ? "L" : "W"}${a}`, awaySource: `${isThirdPlace ? "L" : "W"}${b}`, winner: ready ? picks[id] : undefined, label: `M${id}` });
+  });
+
+  return [...matches.values()].sort((a, b) => a.id - b.id);
+}
+
+function TeamMark({ team, source }: { team: string; source?: string }) {
+  const isPlaceholder = isPlaceholderTeam(team);
+  return (
+    <span className={isPlaceholder ? "team-mark placeholder-team" : "team-mark"}>
+      <span className="flag">{isPlaceholder ? "•" : flags[team] ?? "🏳️"}</span>
+      <span className="team-name">{team}</span>
+      {source && <span className="seed-tag">{source}</span>}
+    </span>
+  );
+}
+
+function MatchCard({
+  match,
+  mode,
+  suspenseId,
+  onSimulate,
+  onPick,
+  allGroupsRevealed
+}: {
+  match: Match;
+  mode: Mode;
+  suspenseId?: number;
+  onSimulate: (id: number) => void;
+  onPick: (id: number, team: string) => void;
+  allGroupsRevealed: boolean;
+}) {
+  const isSuspense = suspenseId === match.id;
+  const canPlay = allGroupsRevealed && !match.winner && !isPlaceholderTeam(match.home) && !isPlaceholderTeam(match.away);
+  const scoreVisible = typeof match.hs === "number" && typeof match.as === "number";
+
+  return (
+    <article className={isSuspense ? "match-card suspense" : match.winner ? "match-card complete" : "match-card"}>
+      <div className="match-topline">
+        <b>M{match.id}</b>
+        {match.winner ? <span>Winner locked</span> : <span>{mode === "manual" ? "Pick winner" : "Awaiting whistle"}</span>}
+      </div>
+      <button className={match.winner === match.home ? "team-button winner" : "team-button"} disabled={mode === "simulation" || !canPlay} onClick={() => onPick(match.id, match.home)}>
+        <TeamMark team={match.home} source={match.homeSource} />
+        <strong>{scoreVisible ? match.hs : ""}</strong>
+      </button>
+      <div className="versus">VS</div>
+      <button className={match.winner === match.away ? "team-button winner" : "team-button"} disabled={mode === "simulation" || !canPlay} onClick={() => onPick(match.id, match.away)}>
+        <TeamMark team={match.away} source={match.awaySource} />
+        <strong>{scoreVisible ? match.as : ""}</strong>
+      </button>
+      {mode === "simulation" && !match.winner && (
+        <button className="simulate-match" disabled={!canPlay || isSuspense} onClick={() => onSimulate(match.id)}>
+          {isSuspense ? "Crowd is rising..." : "Simulate Match"}
+        </button>
+      )}
+      {isSuspense && <div className="energy-bar"><span /></div>}
+    </article>
+  );
 }
 
 export default function Home() {
-  const [seed, setSeed] = useState(1);
+  const [seed, setSeed] = useState(7);
   const [creator, setCreator] = useState(false);
+  const [mode, setMode] = useState<Mode>("simulation");
+  const [revealedGroups, setRevealedGroups] = useState(0);
+  const [revealedMatches, setRevealedMatches] = useState<Record<number, boolean>>({});
+  const [manualPicks, setManualPicks] = useState<Record<number, string>>({});
+  const [suspenseId, setSuspenseId] = useState<number>();
+  const [copied, setCopied] = useState(false);
+
   const result = useMemo(() => simulate(seed), [seed]);
-  const rounds = [
-    ["Round of 32", result.matches.slice(0, 16)],
-    ["Round of 16", result.matches.slice(16, 24)],
-    ["Quarterfinals", result.matches.slice(24, 28)],
-    ["Semifinals", result.matches.slice(28, 30)],
-    ["Third Place Match", result.matches.slice(30, 31)],
-    ["Final", result.matches.slice(31, 32)]
-  ] as const;
+  const allGroupsRevealed = revealedGroups >= groups.length;
+  const revealedSet = useMemo(() => new Set(Object.keys(revealedMatches).map(Number)), [revealedMatches]);
+  const visibleMatches = mode === "simulation"
+    ? buildProgressMatches(result.matches, revealedSet, allGroupsRevealed)
+    : buildManualMatches(result.matches, manualPicks, allGroupsRevealed);
+  const rounds = groupRounds(visibleMatches);
+  const currentGroup = groups[revealedGroups];
+  const champion = mode === "manual" ? manualPicks[104] : revealedMatches[104] ? result.champion : "";
+  const thirdPlaceWinner = mode === "manual" ? manualPicks[103] : revealedMatches[103] ? result.matches.find((match) => match.id === 103)?.winner : "";
+
+  function resetTournament(nextSeed = seed) {
+    setSeed(nextSeed);
+    setRevealedGroups(0);
+    setRevealedMatches({});
+    setManualPicks({});
+    setSuspenseId(undefined);
+    setCopied(false);
+  }
+
+  function revealNextGroup() {
+    setRevealedGroups((count) => Math.min(groups.length, count + 1));
+  }
+
+  function simulateMatch(id: number) {
+    if (suspenseId) return;
+    setSuspenseId(id);
+    window.setTimeout(() => {
+      setRevealedMatches((matches) => ({ ...matches, [id]: true }));
+      setSuspenseId(undefined);
+    }, 3000);
+  }
+
+  function pickWinner(id: number, team: string) {
+    if (!team || isPlaceholderTeam(team)) return;
+    const downstream = new Set<number>();
+    const collectDownstream = (matchId: number) => {
+      nextRounds.forEach(([nextId, a, b]) => {
+        if ((a === matchId || b === matchId) && !downstream.has(nextId)) {
+          downstream.add(nextId);
+          collectDownstream(nextId);
+        }
+      });
+    };
+    collectDownstream(id);
+    setManualPicks((picks) => {
+      const next = { ...picks, [id]: team };
+      downstream.forEach((matchId) => delete next[matchId]);
+      return next;
+    });
+  }
 
   async function share() {
-    const text = `My World Cup 2026 simulator champion: ${result.champion}.`;
+    const winner = champion || "A champion is waiting to be revealed";
+    const url = typeof window !== "undefined" ? window.location.href : "https://github.com/aissadi/worldcup-simulator";
+    const text = `${winner} won my World Cup 2026 simulation 🏆 Try yours here: ${url}`;
     if (navigator.share) await navigator.share({ title: "World Cup 2026 Simulator", text });
     else await navigator.clipboard.writeText(text);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1800);
   }
 
   return (
     <main className={creator ? "app creator" : "app"}>
+      {champion && <div className="confetti" aria-hidden="true"><i /><i /><i /><i /><i /><i /><i /><i /></div>}
       <section className="hero">
-        <div>
-          <p className="kicker"><Tv size={16} /> Live simulator desk</p>
-          <h1>World Cup 2026 Simulator</h1>
-          <p className="lede">Official A-L groups, top two plus the eight best third-place teams, and the FIFA Round of 32 route through to a champion reveal.</p>
+        <div className="hero-copy">
+          <p className="kicker"><Sparkles size={16} /> World Cup 2026 Studio</p>
+          <h1>Build Your Bracket Moment</h1>
+          <p className="lede">Reveal groups, send qualifiers into a cinematic knockout path, and crown a champion with broadcast-style suspense.</p>
+          <div className="mode-switch" aria-label="Simulator mode">
+            <button className={mode === "simulation" ? "active" : ""} onClick={() => { setMode("simulation"); setManualPicks({}); }}>Simulation</button>
+            <button className={mode === "manual" ? "active" : ""} onClick={() => { setMode("manual"); setRevealedMatches({}); setSuspenseId(undefined); }}>Manual Picks</button>
+          </div>
+        </div>
+        <div className="hero-panel">
+          <div className="trophy-orbit"><Trophy size={70} /></div>
+          <span>Champion</span>
+          <strong>{champion || "Awaiting Final"}</strong>
+          {thirdPlaceWinner && <em>Third place: {flags[thirdPlaceWinner]} {thirdPlaceWinner}</em>}
         </div>
         <div className="controls">
-          <button onClick={() => setSeed(seed + 1)}><Shuffle size={18} /> Simulate</button>
-          <button onClick={() => setSeed(1)}><RotateCcw size={18} /> Reset</button>
-          <button onClick={share}><Share2 size={18} /> Share</button>
-          <button onClick={() => setCreator(!creator)}>{creator ? <Minimize2 size={18} /> : <Maximize2 size={18} />} Creator</button>
+          <button onClick={() => resetTournament(seed + 1)}><Shuffle size={18} /> New Draw</button>
+          <button onClick={() => resetTournament(7)}><RotateCcw size={18} /> Reset</button>
+          <button onClick={share}><Share2 size={18} /> Share My Result</button>
+          <button onClick={() => setCreator(!creator)}>{creator ? <Minimize2 size={18} /> : <Maximize2 size={18} />} Creator Mode</button>
         </div>
+        {copied && <p className="toast">Result copied for sharing.</p>}
       </section>
 
-      <section className="champion">
-        <Trophy size={44} />
-        <div>
-          <span>Champion Reveal</span>
-          <strong>{result.champion}</strong>
+      <section className="reveal-stage">
+        <div className="stage-header">
+          <div>
+            <p className="kicker"><Users size={16} /> Group Stage Reveal Mode</p>
+            <h2>{currentGroup ? `Reveal Group ${currentGroup.id}` : "All Groups Revealed"}</h2>
+          </div>
+          <button className="big-action" onClick={revealNextGroup} disabled={!currentGroup}>
+            {currentGroup ? `Reveal Group ${currentGroup.id}` : "Knockouts Ready"}
+          </button>
         </div>
-      </section>
-
-      <section className="grid groups">
-        {result.tables.map((table) => (
-          <article className="panel" key={table.group}>
-            <header><b>Group {table.group}</b><span>Pts GD GF</span></header>
-            {table.standings.map((team, index) => (
-              <div className={index < 2 ? "row qualified" : result.bestThirds.some((t) => t.name === team.name) ? "row third" : "row"} key={team.name}>
-                <span>{index + 1}. {team.name}</span>
-                <em>{team.points} {team.gd >= 0 ? "+" : ""}{team.gd} {team.gf}</em>
-              </div>
-            ))}
-            <details>
-              <summary>Match log</summary>
-              {table.matches.map((match) => <small key={match}>{match}</small>)}
-            </details>
-          </article>
-        ))}
-      </section>
-
-      <section className="thirds">
-        <h2>Best Third-Place Teams</h2>
-        <div>{result.bestThirds.map((t) => <span key={t.name}>{t.group}: {t.name}</span>)}</div>
-      </section>
-
-      <section className="bracket-head">
-        <p className="kicker">Interactive Knockout Bracket</p>
-        <h2>Simulated Path To The Trophy</h2>
-      </section>
-
-      <section className="bracket">
-        {rounds.map(([name, matches]) => (
-          <div className="round" key={name}>
-            <h2>{name}</h2>
-            {matches.map((m) => (
-              <article className="match" key={m.id}>
-                <b>M{m.id}</b>
-                <p className={m.winner === m.home ? "win" : ""}><small>{m.homeSource}</small>{m.home}<span>{m.hs}</span></p>
-                <p className={m.winner === m.away ? "win" : ""}><small>{m.awaySource}</small>{m.away}<span>{m.as}</span></p>
+        <div className="group-filmstrip">
+          {result.tables.map((table, index) => {
+            const revealed = index < revealedGroups;
+            return (
+              <article className={revealed ? "group-card revealed" : "group-card locked"} key={table.group}>
+                <div className="group-title">
+                  <b>Group {table.group}</b>
+                  <span>{revealed ? "Final table" : "Locked"}</span>
+                </div>
+                {revealed ? table.standings.map((team, place) => {
+                  const thirdQualified = place === 2 && result.bestThirds.some((third) => third.name === team.name);
+                  return (
+                    <div className={place < 2 ? "standing qualified" : thirdQualified ? "standing third-qualified" : "standing"} key={team.name}>
+                      <span>{place + 1}</span>
+                      <TeamMark team={team.name} />
+                      <em>{team.points} pts</em>
+                    </div>
+                  );
+                }) : groups[index].teams.map((team) => (
+                  <div className="standing ghost" key={team.name}>
+                    <span>{team.flag}</span>
+                    <b>{team.name}</b>
+                  </div>
+                ))}
               </article>
-            ))}
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="qualified-lane">
+        <p className="kicker"><Zap size={16} /> Qualified Teams</p>
+        <div>
+          {allGroupsRevealed ? result.tables.flatMap((table) => table.standings.slice(0, 2)).concat(result.bestThirds).map((team) => (
+            <span key={`${team.group}-${team.name}`}><span>{team.flag}</span>{team.name}<em>{team.group}</em></span>
+          )) : <strong>Reveal all groups to fill the Round of 32 bracket.</strong>}
+        </div>
+      </section>
+
+      <section className="bracket-hero">
+        <div>
+          <p className="kicker"><Crown size={16} /> Knockout Suspense Mode</p>
+          <h2>{mode === "manual" ? "Tap a team to advance them" : "Simulate each match and watch winners move"}</h2>
+        </div>
+        <div className="final-spot">
+          <Trophy size={42} />
+          <span>M104 Final</span>
+          <b>{champion || "Champion path"}</b>
+        </div>
+      </section>
+
+      <section className="bracket-shell" aria-label="World Cup knockout bracket">
+        {rounds.map((round) => (
+          <div className="round" key={round.name}>
+            <h3>{round.name}</h3>
+            <div className="round-stack">
+              {round.matches.map((match) => (
+                <MatchCard
+                  key={match.id}
+                  match={match}
+                  mode={mode}
+                  suspenseId={suspenseId}
+                  allGroupsRevealed={allGroupsRevealed}
+                  onSimulate={simulateMatch}
+                  onPick={pickWinner}
+                />
+              ))}
+            </div>
           </div>
         ))}
       </section>
