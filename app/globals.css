@@ -237,6 +237,64 @@ h2 {
   box-shadow: inset 0 0 80px rgba(0, 0, 0, 0.45), 0 26px 90px rgba(0, 0, 0, 0.32);
 }
 
+.match-open-card {
+  width: 100%;
+  min-height: 360px;
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid rgba(248, 200, 78, 0.42);
+  border-radius: 28px;
+  color: var(--text);
+  background:
+    radial-gradient(circle at 50% 48%, rgba(248, 200, 78, 0.18), transparent 44%),
+    rgba(255, 255, 255, 0.075);
+  box-shadow: inset 0 0 80px rgba(0, 0, 0, 0.42), 0 26px 90px rgba(0, 0, 0, 0.32);
+  text-align: center;
+  cursor: pointer;
+}
+
+.match-open-card:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+.match-open-card > span {
+  color: var(--green);
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.match-open-card div {
+  min-height: 96px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: rgba(0, 0, 0, 0.22);
+  text-align: left;
+}
+
+.match-open-card div strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 24px;
+}
+
+.match-open-card > b {
+  color: var(--green);
+  font-size: 16px;
+}
+
+.match-open-card.revealed {
+  border-color: rgba(34, 229, 140, 0.45);
+}
+
 .versus-card.suspense {
   border-color: var(--green);
   animation: pulseArena 0.28s linear infinite alternate;
@@ -319,6 +377,43 @@ h2 {
   background: rgba(248, 200, 78, 0.12);
   text-align: center;
   animation: winnerPop 0.45s ease both;
+}
+
+.prediction-screen {
+  min-height: calc(100vh - 36px);
+}
+
+.prediction-result {
+  min-height: 104px;
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid rgba(248, 200, 78, 0.54);
+  border-radius: 22px;
+  color: var(--gold);
+  background:
+    radial-gradient(circle at 50% 0%, rgba(248, 200, 78, 0.25), transparent 56%),
+    rgba(248, 200, 78, 0.1);
+  text-align: center;
+  animation: winnerPop 0.45s ease both;
+}
+
+.prediction-result strong {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  color: var(--text);
+  font-size: 18px;
+}
+
+.prediction-result em {
+  color: var(--muted);
+  font-style: normal;
+  font-weight: 900;
+  text-transform: uppercase;
 }
 
 .champion-screen {

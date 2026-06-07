@@ -3,7 +3,7 @@
 import { RotateCcw, Share2, Sparkles, Trophy, Zap } from "lucide-react";
 import { useMemo, useState } from "react";
 
-type Phase = "landing" | "groups" | "thirds" | "knockout" | "champion";
+type Phase = "landing" | "groups" | "thirds" | "knockout" | "prediction" | "champion";
 type Team = { name: string; rating: number; group: string; flag: string; code?: string };
 type Group = { id: string; teams: Team[] };
 type Standing = Team & { played: number; won: number; drawn: number; lost: number; gf: number; ga: number; gd: number; points: number };
@@ -76,6 +76,7 @@ const nextRounds = [
 
 const groupFixtures = [[0, 1], [2, 3], [0, 2], [1, 3], [0, 3], [1, 2]];
 const matchEvents = ["Kickoff energy is huge", "A dangerous counterattack", "Keeper makes a massive save", "VAR has everyone holding breath", "The stadium is shaking", "Late pressure in the box"];
+const predictionReasons = ["higher attack rating", "better tournament form", "stronger knockout momentum", "more clinical finishing", "better defensive balance", "big-game experience"];
 
 function rngFrom(seed: number) {
   let value = seed >>> 0;
@@ -157,7 +158,7 @@ function simulate(seed: number) {
   const teams = new Map(groups.flatMap((g) => g.teams.map((t) => [t.name, t])));
   const tables = groups.map((group) => {
     const rows = new Map(group.teams.map((t) => [t.name, { ...t, played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, gd: 0, points: 0 } as Standing]));
-    const matches = groupFixtures.map(([h, a]) => {
+    groupFixtures.forEach(([h, a]) => {
       const home = group.teams[h];
       const away = group.teams[a];
       const { hs, as } = decide(home, away, rng);
@@ -168,10 +169,9 @@ function simulate(seed: number) {
       else if (as > hs) { ar.won++; hr.lost++; ar.points += 3; }
       else { hr.drawn++; ar.drawn++; hr.points++; ar.points++; }
       hr.gd = hr.gf - hr.ga; ar.gd = ar.gf - ar.ga;
-      return `${home.name} ${hs}-${as} ${away.name}`;
     });
     const standings = [...rows.values()].sort((a, b) => b.points - a.points || b.gd - a.gd || b.gf - a.gf || b.rating - a.rating);
-    return { group: group.id, standings, matches };
+    return { group: group.id, standings };
   });
 
   const slots = new Map<string, Slot>();
@@ -227,6 +227,10 @@ function roundName(matchId: number) {
   return "Final";
 }
 
+function predictionReason(match: Match) {
+  return predictionReasons[(match.id + match.winner.length + match.hs + match.as) % predictionReasons.length];
+}
+
 export default function Home() {
   const [seed, setSeed] = useState(11);
   const [phase, setPhase] = useState<Phase>("landing");
@@ -237,6 +241,7 @@ export default function Home() {
   const [matchRevealed, setMatchRevealed] = useState(false);
   const [suspense, setSuspense] = useState(false);
   const [eventText, setEventText] = useState("");
+  const [predictionReady, setPredictionReady] = useState(false);
   const [copied, setCopied] = useState(false);
 
   const result = useMemo(() => simulate(seed), [seed]);
@@ -255,6 +260,7 @@ export default function Home() {
     setMatchRevealed(false);
     setSuspense(false);
     setEventText("");
+    setPredictionReady(false);
     setCopied(false);
   }
 
@@ -276,22 +282,31 @@ export default function Home() {
     else setPhase("knockout");
   }
 
-  function simulateMatch() {
+  function startPrediction() {
     setSuspense(true);
+    setPredictionReady(false);
     const eventSeed = currentMatch.id + seed;
     setEventText(matchEvents[eventSeed % matchEvents.length]);
     window.setTimeout(() => setEventText(matchEvents[(eventSeed + 2) % matchEvents.length]), 850);
     window.setTimeout(() => setEventText(matchEvents[(eventSeed + 4) % matchEvents.length]), 1700);
     window.setTimeout(() => {
       setSuspense(false);
-      setMatchRevealed(true);
+      setPredictionReady(true);
     }, 2600);
+  }
+
+  function sendWinnerToBracket() {
+    setMatchRevealed(true);
+    setPredictionReady(false);
+    setEventText("");
+    setPhase("knockout");
   }
 
   function nextMatch() {
     if (matchIndex < result.matches.length - 1) {
       setMatchIndex(matchIndex + 1);
       setMatchRevealed(false);
+      setPredictionReady(false);
       setEventText("");
     } else {
       setPhase("champion");
@@ -309,7 +324,7 @@ export default function Home() {
 
   return (
     <main className="app">
-      {(phase === "champion" || matchRevealed && currentMatch.id === 104) && <div className="confetti" aria-hidden="true"><i /><i /><i /><i /><i /><i /><i /><i /></div>}
+      {(phase === "champion" || (matchRevealed && currentMatch.id === 104)) && <div className="confetti" aria-hidden="true"><i /><i /><i /><i /><i /><i /><i /><i /></div>}
 
       {phase === "landing" && (
         <section className="screen landing">
@@ -370,27 +385,49 @@ export default function Home() {
         <section className="screen match-screen">
           <p className="step">{roundName(currentMatch.id)} · M{currentMatch.id}</p>
           <h2>{roundName(currentMatch.id)}</h2>
-          <div className={suspense ? "versus-card suspense" : "versus-card"}>
-            <div className={matchRevealed && currentMatch.winner === currentMatch.home ? "team-side winner" : "team-side"}>
-              {flag(currentMatch.home, "large")}
-              <strong>{currentMatch.home}</strong>
-              {matchRevealed && <b>{currentMatch.hs}</b>}
-            </div>
-            <span className="vs">VS</span>
-            <div className={matchRevealed && currentMatch.winner === currentMatch.away ? "team-side winner" : "team-side"}>
-              {flag(currentMatch.away, "large")}
-              <strong>{currentMatch.away}</strong>
-              {matchRevealed && <b>{currentMatch.as}</b>}
-            </div>
-            {suspense && <div className="suspense-box"><span>{eventText}</span><i /></div>}
-          </div>
+          <button className={matchRevealed ? "match-open-card revealed" : "match-open-card"} onClick={() => setPhase("prediction")} disabled={matchRevealed}>
+            <span>Tap match card to open prediction</span>
+            <div>{flag(currentMatch.home)}<strong>{currentMatch.home}</strong></div>
+            <b>VS</b>
+            <div>{flag(currentMatch.away)}<strong>{currentMatch.away}</strong></div>
+          </button>
           {matchRevealed && (
             <div className="winner-reveal">
               <Trophy size={26} />
               <strong>{flag(currentMatch.winner)} {currentMatch.winner} advance</strong>
             </div>
           )}
-          {!matchRevealed ? <button className="primary" disabled={suspense} onClick={simulateMatch}>{suspense ? "Simulating..." : "Simulate Match"}</button> : <button className="primary" onClick={nextMatch}>{currentMatch.id === 104 ? "Reveal Champion" : "Next Match"}</button>}
+          {matchRevealed ? <button className="primary" onClick={nextMatch}>{currentMatch.id === 104 ? "Reveal Champion" : "Next Match"}</button> : <button className="primary" onClick={() => setPhase("prediction")}>Open Match Prediction</button>}
+        </section>
+      )}
+
+      {phase === "prediction" && currentMatch && (
+        <section className="screen match-screen prediction-screen">
+          <p className="step">AI Match Prediction · M{currentMatch.id}</p>
+          <h2>{roundName(currentMatch.id)}</h2>
+          <div className={suspense ? "versus-card suspense" : "versus-card"}>
+            <div className={predictionReady && currentMatch.winner === currentMatch.home ? "team-side winner" : "team-side"}>
+              {flag(currentMatch.home, "large")}
+              <strong>{currentMatch.home}</strong>
+              {predictionReady && <b>{currentMatch.hs}</b>}
+            </div>
+            <span className="vs">VS</span>
+            <div className={predictionReady && currentMatch.winner === currentMatch.away ? "team-side winner" : "team-side"}>
+              {flag(currentMatch.away, "large")}
+              <strong>{currentMatch.away}</strong>
+              {predictionReady && <b>{currentMatch.as}</b>}
+            </div>
+            {suspense && <div className="suspense-box"><span>{eventText}</span><i /></div>}
+          </div>
+          {predictionReady && (
+            <div className="prediction-result">
+              <Trophy size={26} />
+              <strong>{flag(currentMatch.winner)} {currentMatch.winner} predicted to win</strong>
+              <em>Reason: {predictionReason(currentMatch)}</em>
+            </div>
+          )}
+          {!predictionReady ? <button className="primary" disabled={suspense} onClick={startPrediction}>{suspense ? "Predicting..." : "AI Predict Winner"}</button> : <button className="primary" onClick={sendWinnerToBracket}>Send Winner To Bracket</button>}
+          <button className="secondary" onClick={() => setPhase("knockout")}>Back To Tournament</button>
         </section>
       )}
 
