@@ -1,7 +1,8 @@
 "use client";
 
 import { ChevronLeft, Share2, Sparkles, Trophy, Volume2, Zap } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { languageOptions, locales, type LocaleCode } from "../locales";
 
 type Phase = "home" | "tournamentGroup" | "groupSelect" | "groupReveal" | "matchSelect" | "predictor" | "knockout" | "roundSet" | "champion";
 type Team = { name: string; rating: number; group: string; flag: string; code?: string };
@@ -10,6 +11,8 @@ type Standing = Team & { played: number; won: number; drawn: number; lost: numbe
 type Slot = { source: string; team: string };
 type Match = { id: number; home: string; away: string; homeSource: string; awaySource: string; hs: number; as: number; winner: string; label: string };
 type Flow = "full" | "group" | "singleMatch" | "knockout";
+type RoundKey = "roundOf32" | "roundOf16" | "quarterfinals" | "semifinals" | "thirdPlaceMatch" | "final";
+type RoundSetKey = "roundOf16Set" | "quarterfinalsSet" | "semifinalsSet" | "finalSet";
 
 const flagEmoji: Record<string, string> = {
   "Mexico": "🇲🇽", "South Africa": "🇿🇦", "South Korea": "🇰🇷", "Czechia": "🇨🇿",
@@ -76,9 +79,6 @@ const nextRounds = [
 ] as const;
 
 const groupFixtures = [[0, 1], [2, 3], [0, 2], [1, 3], [0, 3], [1, 2]];
-const groupSuspense = ["Calculating results...", "Checking goal difference...", "Ranking teams..."];
-const predictionSuspense = ["Analyzing team form...", "Checking ratings...", "Running simulation..."];
-const predictionReasons = ["higher attack rating", "better tournament form", "stronger knockout momentum", "more clinical finishing", "better defensive balance", "big-game experience"];
 
 function rngFrom(seed: number) {
   let value = seed >>> 0;
@@ -220,25 +220,25 @@ function flag(name: string, size = "normal") {
   );
 }
 
-function roundName(matchId: number) {
-  if (matchId <= 88) return "Round of 32";
-  if (matchId <= 96) return "Round of 16";
-  if (matchId <= 100) return "Quarterfinals";
-  if (matchId <= 102) return "Semifinals";
-  if (matchId === 103) return "Third Place Match";
-  return "Final";
+function roundKey(matchId: number): RoundKey {
+  if (matchId <= 88) return "roundOf32";
+  if (matchId <= 96) return "roundOf16";
+  if (matchId <= 100) return "quarterfinals";
+  if (matchId <= 102) return "semifinals";
+  if (matchId === 103) return "thirdPlaceMatch";
+  return "final";
 }
 
-function nextRoundSetMessage(matchId: number) {
-  if (matchId === 88) return "Round of 16 is set";
-  if (matchId === 96) return "Quarterfinals are set";
-  if (matchId === 100) return "Semifinals are set";
-  if (matchId === 102) return "Final is set";
+function nextRoundSetKey(matchId: number): RoundSetKey | "" {
+  if (matchId === 88) return "roundOf16Set";
+  if (matchId === 96) return "quarterfinalsSet";
+  if (matchId === 100) return "semifinalsSet";
+  if (matchId === 102) return "finalSet";
   return "";
 }
 
-function predictionReason(match: Match) {
-  return predictionReasons[(match.id + match.winner.length + match.hs + match.as) % predictionReasons.length];
+function predictionReasonIndex(match: Match) {
+  return (match.id + match.winner.length + match.hs + match.as) % locales.en.predictionReasons.length;
 }
 
 function playTone(frequency: number, duration = 0.12, type: OscillatorType = "sine") {
@@ -267,6 +267,7 @@ function playWhoosh() {
 }
 
 export default function Home() {
+  const [language, setLanguage] = useState<LocaleCode>("en");
   const [seed, setSeed] = useState(11);
   const [phase, setPhase] = useState<Phase>("home");
   const [flow, setFlow] = useState<Flow>("full");
@@ -285,11 +286,28 @@ export default function Home() {
   const [copied, setCopied] = useState(false);
 
   const result = useMemo(() => simulate(seed), [seed]);
+  const t = locales[language];
+  const isRtl = t.dir === "rtl";
   const currentGroupIndex = flow === "group" ? selectedGroupIndex : groupIndex;
   const currentGroup = result.tables[currentGroupIndex];
   const currentMatch = result.matches[matchIndex];
   const champion = result.champion;
   const thirdQualified = new Set(result.bestThirds.map((item) => item.name));
+
+  useEffect(() => {
+    const saved = window.localStorage.getItem("worldcup-language") as LocaleCode | null;
+    if (saved && saved in locales) setLanguage(saved);
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem("worldcup-language", language);
+    document.documentElement.lang = t.langCode;
+    document.documentElement.dir = t.dir;
+  }, [language, t.dir, t.langCode]);
+
+  function tr(template: string, values: Record<string, string>) {
+    return Object.entries(values).reduce((text, [key, value]) => text.replaceAll(`{${key}}`, value), template);
+  }
 
   function reset(nextSeed = seed + 1) {
     setSeed(nextSeed);
@@ -325,7 +343,7 @@ export default function Home() {
     if (groupLoading || groupRevealed) return;
     setGroupLoading(true);
     playDrumRoll();
-    groupSuspense.forEach((message, index) => window.setTimeout(() => setGroupMessage(message), index * 760));
+    t.groupSuspense.forEach((message, index) => window.setTimeout(() => setGroupMessage(message), index * 760));
     window.setTimeout(() => {
       setGroupLoading(false);
       setGroupRevealed(true);
@@ -362,7 +380,7 @@ export default function Home() {
     setPredictionLoading(true);
     setPredictionReady(false);
     playDrumRoll();
-    predictionSuspense.forEach((message, index) => window.setTimeout(() => {
+    t.predictionSuspense.forEach((message, index) => window.setTimeout(() => {
       setPredictionMessage(message);
       setCountdown(3 - index);
     }, index * 900));
@@ -384,7 +402,8 @@ export default function Home() {
   }
 
   function nextMatch() {
-    const message = nextRoundSetMessage(currentMatch.id);
+    const messageKey = nextRoundSetKey(currentMatch.id);
+    const message = messageKey ? t[messageKey] : "";
     if (message && flow === "knockout") {
       setRoundSetMessage(message);
       setPhase("roundSet");
@@ -413,26 +432,31 @@ export default function Home() {
 
   async function share(text: string) {
     if (navigator.clipboard) await navigator.clipboard.writeText(text);
-    else if (navigator.share) await navigator.share({ title: "World Cup 2026 Simulator", text });
+    else if (navigator.share) await navigator.share({ title: t.appTitle, text });
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1600);
   }
 
   function shareResult() {
     const url = typeof window !== "undefined" ? window.location.href : "https://github.com/aissadi/worldcup-simulator";
-    share(`${champion} won my World Cup 2026 simulation 🏆 Try yours here: ${url}`);
+    share(tr(t.shareResultText, { team: champion, url }));
   }
 
   function sharePrediction() {
     const url = typeof window !== "undefined" ? window.location.href : "https://github.com/aissadi/worldcup-simulator";
-    share(`${currentMatch.winner} beat ${currentMatch.winner === currentMatch.home ? currentMatch.away : currentMatch.home} ${currentMatch.hs}-${currentMatch.as} in my World Cup 2026 prediction 🏆 Try yours here: ${url}`);
+    share(tr(t.sharePredictionText, {
+      winner: currentMatch.winner,
+      loser: currentMatch.winner === currentMatch.home ? currentMatch.away : currentMatch.home,
+      score: `${currentMatch.hs}-${currentMatch.as}`,
+      url
+    }));
   }
 
   const groupScreen = (
     <section className="screen">
-      <button className="back" onClick={() => setPhase(flow === "group" ? "groupSelect" : "home")}><ChevronLeft size={18} /> Back</button>
-      <p className="step">Group {currentGroup.group}</p>
-      <h2>Group {currentGroup.group}</h2>
+      <button className="back" onClick={() => setPhase(flow === "group" ? "groupSelect" : "home")}><ChevronLeft size={18} /> {t.back}</button>
+      <p className="step">{t.group} {currentGroup.group}</p>
+      <h2>{t.group} {currentGroup.group}</h2>
       {!groupRevealed ? (
         <div className="team-list">
           {groups[currentGroupIndex].teams.map((item) => <div className="team-row" key={item.name}>{flag(item.name)}<strong>{item.name}</strong></div>)}
@@ -441,47 +465,55 @@ export default function Home() {
         <div className="standings">
           {currentGroup.standings.map((item, index) => {
             const third = index === 2 && thirdQualified.has(item.name);
-            const label = index === 0 ? "🥇 1st qualified" : index === 1 ? "🥈 2nd qualified" : third ? "🟡 3rd qualified" : "❌ eliminated";
+            const label = index === 0 ? t.firstQualified : index === 1 ? t.secondQualified : third ? t.thirdQualified : t.eliminated;
             return (
               <article className={index < 2 ? "standing-card qualified" : third ? "standing-card third" : "standing-card out"} key={item.name} style={{ animationDelay: `${index * 190}ms` }}>
                 <span className="place">{index + 1}</span>
                 {flag(item.name)}
                 <div><strong>{item.name}</strong><em>{label}</em></div>
-                <b>{item.points} pts</b>
+                <b>{item.points} {t.pointsShort}</b>
               </article>
             );
           })}
         </div>
       )}
       {groupLoading && <div className="loading-card"><Volume2 size={20} /><strong>{groupMessage}</strong><i /></div>}
-      {!groupRevealed ? <button className="primary" disabled={groupLoading} onClick={revealGroup}>{groupLoading ? "Revealing..." : "Reveal Group"}</button> : <button className="primary" onClick={continueAfterGroup}>{flow === "full" ? groupIndex === 11 ? "Start Knockouts" : `Next: Group ${groups[groupIndex + 1].id}` : "Back To Groups"}</button>}
+      {!groupRevealed ? <button className="primary" disabled={groupLoading} onClick={revealGroup}>{groupLoading ? t.revealing : t.revealGroup}</button> : <button className="primary" onClick={continueAfterGroup}>{flow === "full" ? groupIndex === 11 ? t.startKnockouts : `${t.nextGroup} ${groups[groupIndex + 1].id}` : t.backToGroups}</button>}
     </section>
   );
 
   return (
-    <main className="app">
+    <main className={isRtl ? "app rtl" : "app"} dir={t.dir}>
+      <div className="language-switcher" aria-label={t.languageLabel}>
+        {languageOptions.map((option) => (
+          <button className={language === option.code ? "active" : ""} key={option.code} onClick={() => setLanguage(option.code)}>
+            <span>{option.flag}</span>
+            <b>{option.label}</b>
+          </button>
+        ))}
+      </div>
       {phase === "champion" && <div className="confetti" aria-hidden="true"><i /><i /><i /><i /><i /><i /><i /><i /></div>}
 
       {phase === "home" && (
         <section className="screen landing">
-          <p className="kicker"><Sparkles size={16} /> FIFA + Sofascore + ESPN energy</p>
-          <h1>World Cup 2026 Simulator</h1>
+          <p className="kicker"><Sparkles size={16} /> {t.homeKicker}</p>
+          <h1>{t.appTitle}</h1>
           <div className="home-grid">
-            <button className="home-card" onClick={() => openHomeCard("full")}><b>Full Tournament Simulation</b><span>Start at groups and reveal the champion.</span></button>
-            <button className="home-card" onClick={() => openHomeCard("group")}><b>Group Reveal</b><span>Choose any group A-L.</span></button>
-            <button className="home-card" onClick={() => openHomeCard("singleMatch")}><b>Match Predictor</b><span>Pick one fixture and run the AI reveal.</span></button>
-            <button className="home-card" onClick={() => openHomeCard("knockout")}><b>Knockout Simulator</b><span>Start from the Round of 32.</span></button>
+            <button className="home-card" onClick={() => openHomeCard("full")}><b>{t.fullTournament}</b><span>{t.fullTournamentDescription}</span></button>
+            <button className="home-card" onClick={() => openHomeCard("group")}><b>{t.groupReveal}</b><span>{t.groupRevealDescription}</span></button>
+            <button className="home-card" onClick={() => openHomeCard("singleMatch")}><b>{t.matchPredictor}</b><span>{t.matchPredictorDescription}</span></button>
+            <button className="home-card" onClick={() => openHomeCard("knockout")}><b>{t.knockoutSimulator}</b><span>{t.knockoutSimulatorDescription}</span></button>
           </div>
         </section>
       )}
 
       {phase === "groupSelect" && (
         <section className="screen">
-          <button className="back" onClick={() => setPhase("home")}><ChevronLeft size={18} /> Back</button>
-          <p className="kicker">Choose your group</p>
-          <h2>Group Reveal</h2>
+          <button className="back" onClick={() => setPhase("home")}><ChevronLeft size={18} /> {t.back}</button>
+          <p className="kicker">{t.chooseYourGroup}</p>
+          <h2>{t.groupReveal}</h2>
           <div className="group-grid">
-            {groups.map((group, index) => <button key={group.id} onClick={() => { setSelectedGroupIndex(index); setGroupRevealed(false); setPhase("groupReveal"); }}>Group {group.id}</button>)}
+            {groups.map((group, index) => <button key={group.id} onClick={() => { setSelectedGroupIndex(index); setGroupRevealed(false); setPhase("groupReveal"); }}>{t.group} {group.id}</button>)}
           </div>
         </section>
       )}
@@ -490,15 +522,15 @@ export default function Home() {
 
       {phase === "matchSelect" && (
         <section className="screen">
-          <button className="back" onClick={() => setPhase("home")}><ChevronLeft size={18} /> Back</button>
-          <p className="kicker">Choose one match</p>
-          <h2>Match Predictor</h2>
+          <button className="back" onClick={() => setPhase("home")}><ChevronLeft size={18} /> {t.back}</button>
+          <p className="kicker">{t.chooseOneMatch}</p>
+          <h2>{t.matchPredictor}</h2>
           <div className="match-list">
             {result.matches.map((match, index) => (
               <button className="mini-match" key={match.id} onClick={() => openPredictor(index, "singleMatch")}>
-                <span>M{match.id}</span>
+                <span>{tr(t.matchNumber, { number: String(match.id) })}</span>
                 <b>{flag(match.home)} {match.home}</b>
-                <em>vs</em>
+                <em>{t.versus}</em>
                 <b>{flag(match.away)} {match.away}</b>
               </button>
             ))}
@@ -508,34 +540,34 @@ export default function Home() {
 
       {phase === "knockout" && currentMatch && (
         <section className="screen match-screen">
-          <p className="step">{roundName(currentMatch.id)} · M{currentMatch.id}</p>
-          <h2>{roundName(currentMatch.id)}</h2>
+          <p className="step">{t[roundKey(currentMatch.id)]} · {tr(t.matchNumber, { number: String(currentMatch.id) })}</p>
+          <h2>{t[roundKey(currentMatch.id)]}</h2>
           <button className={matchRevealed ? "match-open-card revealed" : "match-open-card"} onClick={() => setPhase("predictor")} disabled={matchRevealed}>
-            <span>Tap match card to open prediction</span>
+            <span>{t.matchCardHint}</span>
             <div>{flag(currentMatch.home)}<strong>{currentMatch.home}</strong></div>
-            <b>VS</b>
+            <b>{t.versus}</b>
             <div>{flag(currentMatch.away)}<strong>{currentMatch.away}</strong></div>
           </button>
-          {matchRevealed && <div className="winner-reveal"><Trophy size={26} /><strong>{flag(currentMatch.winner)} {currentMatch.winner} advance</strong></div>}
-          {matchRevealed ? <button className="primary" onClick={nextMatch}>{currentMatch.id === 104 ? "Reveal Champion" : "Next Match"}</button> : <button className="primary" onClick={() => setPhase("predictor")}>Open Match Prediction</button>}
+          {matchRevealed && <div className="winner-reveal"><Trophy size={26} /><strong>{flag(currentMatch.winner)} {currentMatch.winner} {t.advance}</strong></div>}
+          {matchRevealed ? <button className="primary" onClick={nextMatch}>{currentMatch.id === 104 ? t.revealChampion : t.nextMatch}</button> : <button className="primary" onClick={() => setPhase("predictor")}>{t.openMatchPrediction}</button>}
         </section>
       )}
 
       {phase === "predictor" && currentMatch && (
         <section className="screen match-screen prediction-screen">
-          <button className="back" onClick={() => setPhase(flow === "singleMatch" ? "matchSelect" : "knockout")}><ChevronLeft size={18} /> Back To Tournament</button>
-          <p className="step">AI Match Prediction · M{currentMatch.id}</p>
+          <button className="back" onClick={() => setPhase(flow === "singleMatch" ? "matchSelect" : "knockout")}><ChevronLeft size={18} /> {t.backToTournament}</button>
+          <p className="step">{t.aiMatchPrediction} · {tr(t.matchNumber, { number: String(currentMatch.id) })}</p>
           <div className={predictionLoading ? "versus-card suspense" : "versus-card"}>
             <div className={predictionReady && currentMatch.winner === currentMatch.home ? "team-side winner" : "team-side"}>{flag(currentMatch.home, "large")}<strong>{currentMatch.home}</strong>{predictionReady && <b>{currentMatch.hs}</b>}</div>
-            <span className="vs">VS</span>
+            <span className="vs">{t.versus}</span>
             <div className={predictionReady && currentMatch.winner === currentMatch.away ? "team-side winner" : "team-side"}>{flag(currentMatch.away, "large")}<strong>{currentMatch.away}</strong>{predictionReady && <b>{currentMatch.as}</b>}</div>
             {predictionLoading && <div className="suspense-box"><strong>{countdown}</strong><span>{predictionMessage}</span><i /></div>}
           </div>
-          {predictionReady && <div className="prediction-result"><Trophy size={26} /><strong>{flag(currentMatch.winner)} {currentMatch.winner} predicted to win</strong><em>Reason: {predictionReason(currentMatch)}</em></div>}
-          {!predictionReady ? <button className="primary" disabled={predictionLoading} onClick={startPrediction}>{predictionLoading ? "Predicting..." : "AI Predict Winner"}</button> : <button className="primary" onClick={returnAfterPrediction}>Send Winner To Bracket</button>}
-          {predictionReady && <button className="secondary" onClick={sharePrediction}><Share2 size={18} /> Share Prediction</button>}
-          {flow === "singleMatch" && predictionReady && <button className="secondary" onClick={() => openPredictor(Math.min(matchIndex + 1, result.matches.length - 1), "singleMatch")}>Next Match</button>}
-          {copied && <p className="copied">Copied to clipboard.</p>}
+          {predictionReady && <div className="prediction-result"><Trophy size={26} /><strong>{flag(currentMatch.winner)} {currentMatch.winner} {t.predictedToWin}</strong><em>{t.reason}: {t.predictionReasons[predictionReasonIndex(currentMatch)]}</em></div>}
+          {!predictionReady ? <button className="primary" disabled={predictionLoading} onClick={startPrediction}>{predictionLoading ? t.predicting : t.aiPredictWinner}</button> : <button className="primary" onClick={returnAfterPrediction}>{t.sendWinnerToBracket}</button>}
+          {predictionReady && <button className="secondary" onClick={sharePrediction}><Share2 size={18} /> {t.sharePrediction}</button>}
+          {flow === "singleMatch" && predictionReady && <button className="secondary" onClick={() => openPredictor(Math.min(matchIndex + 1, result.matches.length - 1), "singleMatch")}>{t.nextMatch}</button>}
+          {copied && <p className="copied">{t.copied}</p>}
         </section>
       )}
 
@@ -543,17 +575,17 @@ export default function Home() {
         <section className="screen champion-screen">
           <div className="trophy-glow"><Zap size={72} /></div>
           <h2>{roundSetMessage}</h2>
-          <button className="primary" onClick={continueRoundSet}>Continue</button>
+          <button className="primary" onClick={continueRoundSet}>{t.continue}</button>
         </section>
       )}
 
       {phase === "champion" && (
         <section className="screen champion-screen">
           <div className="trophy-glow"><Trophy size={88} /></div>
-          <h2>{flag(champion, "large")} {champion} won my World Cup 2026 simulation 🏆</h2>
-          <button className="primary" onClick={shareResult}><Share2 size={18} /> Share My Result</button>
-          <button className="secondary" onClick={() => reset()}><Sparkles size={18} /> Try Again</button>
-          {copied && <p className="copied">Copied to clipboard.</p>}
+          <h2>{flag(champion, "large")} {tr(t.championLine, { team: champion })}</h2>
+          <button className="primary" onClick={shareResult}><Share2 size={18} /> {t.shareMyResult}</button>
+          <button className="secondary" onClick={() => reset()}><Sparkles size={18} /> {t.tryAgain}</button>
+          {copied && <p className="copied">{t.copied}</p>}
         </section>
       )}
     </main>

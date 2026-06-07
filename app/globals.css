@@ -12,14 +12,20 @@
 }
 
 * { box-sizing: border-box; }
-html, body { min-height: 100%; margin: 0; background: var(--bg); color: var(--text); font-family: Arial, Helvetica, sans-serif; }
+html, body {
+  min-height: 100%;
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Cairo", "Tajawal", "Noto Sans Arabic", Arial, Helvetica, sans-serif;
+}
 button { font: inherit; }
 
 .app {
   min-height: 100vh;
   display: grid;
   place-items: stretch;
-  padding: 18px;
+  padding: 76px 18px 18px;
   background:
     radial-gradient(circle at 50% -10%, rgba(248, 200, 78, 0.26), transparent 34%),
     radial-gradient(circle at 86% 8%, rgba(34, 229, 140, 0.15), transparent 26%),
@@ -28,10 +34,53 @@ button { font: inherit; }
     #040504;
 }
 
+.language-switcher {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 30;
+  display: flex;
+  gap: 6px;
+  max-width: calc(100vw - 24px);
+  padding: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(4, 5, 4, 0.86);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.38);
+  backdrop-filter: blur(18px);
+}
+
+.language-switcher button {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 999px;
+  color: var(--muted);
+  background: transparent;
+  font-size: 12px;
+  font-weight: 900;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.language-switcher button.active {
+  color: #041208;
+  background: var(--gold);
+}
+
+.language-switcher span {
+  font-size: 16px;
+  line-height: 1;
+}
+
 .screen {
   width: 100%;
   max-width: 560px;
-  min-height: calc(100vh - 36px);
+  min-height: calc(100vh - 94px);
   margin: 0 auto;
   display: flex;
   flex-direction: column;
@@ -42,6 +91,44 @@ button { font: inherit; }
 
 .landing {
   text-align: left;
+}
+
+.rtl {
+  direction: rtl;
+  text-align: right;
+}
+
+.rtl .language-switcher {
+  right: auto;
+  left: 12px;
+}
+
+.rtl .landing,
+.rtl .home-card,
+.rtl .mini-match,
+.rtl .match-open-card div {
+  text-align: right;
+}
+
+.rtl .back {
+  align-self: flex-end;
+}
+
+.rtl .back svg {
+  transform: rotate(180deg);
+}
+
+.rtl .kicker,
+.rtl .step,
+.rtl .primary,
+.rtl .secondary,
+.rtl .back {
+  flex-direction: row-reverse;
+}
+
+.rtl .loading-card i,
+.rtl .suspense-box i {
+  transform-origin: right;
 }
 
 .kicker, .step {
@@ -511,7 +598,7 @@ h2 {
 }
 
 .prediction-screen {
-  min-height: calc(100vh - 36px);
+  min-height: calc(100vh - 94px);
 }
 
 .prediction-result {
@@ -641,12 +728,12 @@ h2 {
 
 @media (min-width: 720px) {
   .app {
-    padding: 28px;
+    padding: 82px 28px 28px;
   }
 
   .screen {
     max-width: 620px;
-    min-height: calc(100vh - 56px);
+    min-height: calc(100vh - 110px);
   }
 
   .versus-card {
