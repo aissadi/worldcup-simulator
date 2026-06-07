@@ -333,6 +333,12 @@ export default function Home() {
     ? buildProgressMatches(result.matches, revealedSet, allGroupsRevealed)
     : buildManualMatches(result.matches, manualPicks, allGroupsRevealed);
   const rounds = groupRounds(visibleMatches);
+  const roundOf32 = rounds[0].matches;
+  const roundOf16 = rounds[1].matches;
+  const quarterfinals = rounds[2].matches;
+  const semifinals = rounds[3].matches;
+  const thirdPlaceMatch = rounds[4].matches[0];
+  const finalMatch = rounds[5].matches[0];
   const currentGroup = groups[revealedGroups];
   const champion = mode === "manual" ? manualPicks[104] : revealedMatches[104] ? result.champion : "";
   const thirdPlaceWinner = mode === "manual" ? manualPicks[103] : revealedMatches[103] ? result.matches.find((match) => match.id === 103)?.winner : "";
@@ -477,7 +483,78 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="bracket-shell" aria-label="World Cup knockout bracket">
+      <section className="cinema-bracket" aria-label="World Cup knockout bracket">
+        <div className="branch branch-left">
+          <div className="branch-column r32-column">
+            <h3>Round of 32</h3>
+            {roundOf32.slice(0, 8).map((match) => (
+              <MatchCard key={match.id} match={match} mode={mode} suspenseId={suspenseId} allGroupsRevealed={allGroupsRevealed} onSimulate={simulateMatch} onPick={pickWinner} />
+            ))}
+          </div>
+          <div className="branch-column r16-column">
+            <h3>Round of 16</h3>
+            {roundOf16.slice(0, 4).map((match) => (
+              <MatchCard key={match.id} match={match} mode={mode} suspenseId={suspenseId} allGroupsRevealed={allGroupsRevealed} onSimulate={simulateMatch} onPick={pickWinner} />
+            ))}
+          </div>
+          <div className="branch-column qf-column">
+            <h3>Quarterfinals</h3>
+            {quarterfinals.slice(0, 2).map((match) => (
+              <MatchCard key={match.id} match={match} mode={mode} suspenseId={suspenseId} allGroupsRevealed={allGroupsRevealed} onSimulate={simulateMatch} onPick={pickWinner} />
+            ))}
+          </div>
+          <div className="branch-column sf-column">
+            <h3>Semifinal</h3>
+            {semifinals.slice(0, 1).map((match) => (
+              <MatchCard key={match.id} match={match} mode={mode} suspenseId={suspenseId} allGroupsRevealed={allGroupsRevealed} onSimulate={simulateMatch} onPick={pickWinner} />
+            ))}
+          </div>
+        </div>
+
+        <div className="center-lane">
+          <div className="world-cup-silhouette">
+            <Trophy size={82} />
+            <span>FIFA</span>
+          </div>
+          <div className="center-match final-center">
+            <p>Final</p>
+            <MatchCard match={finalMatch} mode={mode} suspenseId={suspenseId} allGroupsRevealed={allGroupsRevealed} onSimulate={simulateMatch} onPick={pickWinner} />
+          </div>
+          <div className="center-match third-center">
+            <p>3rd Place Match</p>
+            <MatchCard match={thirdPlaceMatch} mode={mode} suspenseId={suspenseId} allGroupsRevealed={allGroupsRevealed} onSimulate={simulateMatch} onPick={pickWinner} />
+          </div>
+        </div>
+
+        <div className="branch branch-right">
+          <div className="branch-column sf-column">
+            <h3>Semifinal</h3>
+            {semifinals.slice(1, 2).map((match) => (
+              <MatchCard key={match.id} match={match} mode={mode} suspenseId={suspenseId} allGroupsRevealed={allGroupsRevealed} onSimulate={simulateMatch} onPick={pickWinner} />
+            ))}
+          </div>
+          <div className="branch-column qf-column">
+            <h3>Quarterfinals</h3>
+            {quarterfinals.slice(2, 4).map((match) => (
+              <MatchCard key={match.id} match={match} mode={mode} suspenseId={suspenseId} allGroupsRevealed={allGroupsRevealed} onSimulate={simulateMatch} onPick={pickWinner} />
+            ))}
+          </div>
+          <div className="branch-column r16-column">
+            <h3>Round of 16</h3>
+            {roundOf16.slice(4, 8).map((match) => (
+              <MatchCard key={match.id} match={match} mode={mode} suspenseId={suspenseId} allGroupsRevealed={allGroupsRevealed} onSimulate={simulateMatch} onPick={pickWinner} />
+            ))}
+          </div>
+          <div className="branch-column r32-column">
+            <h3>Round of 32</h3>
+            {roundOf32.slice(8, 16).map((match) => (
+              <MatchCard key={match.id} match={match} mode={mode} suspenseId={suspenseId} allGroupsRevealed={allGroupsRevealed} onSimulate={simulateMatch} onPick={pickWinner} />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="mobile-bracket" aria-label="Mobile World Cup knockout bracket">
         {rounds.map((round) => (
           <div className="round" key={round.name}>
             <h3>{round.name}</h3>
