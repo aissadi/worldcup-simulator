@@ -26,6 +26,32 @@ const flags: Record<string, string> = {
   "England": "🏴", "Ghana": "🇬🇭", "Croatia": "🇭🇷", "Panama": "🇵🇦"
 };
 
+const flagCodes: Record<string, string> = {
+  "Mexico": "mx", "South Africa": "za", "South Korea": "kr", "Czechia": "cz",
+  "Canada": "ca", "Bosnia and Herzegovina": "ba", "Qatar": "qa", "Switzerland": "ch",
+  "Brazil": "br", "Morocco": "ma", "Haiti": "ht", "Scotland": "gb-sct",
+  "United States": "us", "Paraguay": "py", "Türkiye": "tr", "Australia": "au",
+  "Germany": "de", "Curaçao": "cw", "Ecuador": "ec", "Ivory Coast": "ci",
+  "Netherlands": "nl", "Japan": "jp", "Sweden": "se", "Tunisia": "tn",
+  "Belgium": "be", "Egypt": "eg", "Iran": "ir", "New Zealand": "nz",
+  "Spain": "es", "Saudi Arabia": "sa", "Uruguay": "uy", "Cape Verde": "cv",
+  "France": "fr", "Senegal": "sn", "Norway": "no", "Iraq": "iq",
+  "Argentina": "ar", "Algeria": "dz", "Austria": "at", "Jordan": "jo",
+  "Portugal": "pt", "DR Congo": "cd", "Uzbekistan": "uz", "Colombia": "co",
+  "England": "gb-eng", "Ghana": "gh", "Croatia": "hr", "Panama": "pa"
+};
+
+const matchEventPool = [
+  "Anthem volume rising",
+  "First attack down the wing",
+  "Keeper makes a huge stop",
+  "VAR check has the crowd frozen",
+  "Counterattack opens the pitch",
+  "Stadium noise hits full blast",
+  "Late pressure in the box",
+  "Captain steps up under the lights"
+];
+
 const groupSeed: Array<[string, Array<[string, number]>]> = [
   ["A", [["Mexico", 82], ["South Africa", 75], ["South Korea", 80], ["Czechia", 79]]],
   ["B", [["Canada", 79], ["Bosnia and Herzegovina", 78], ["Qatar", 76], ["Switzerland", 83]]],
@@ -196,7 +222,7 @@ function blankMatch(id: number, homeSource: string, awaySource: string, home = "
 }
 
 function isPlaceholderTeam(team: string) {
-  return team === "Qualified team" || team.startsWith("Winner M") || team.startsWith("Loser M");
+  return team.startsWith("Winner M") || team.startsWith("Loser M");
 }
 
 function roundFor(matchId: number) {
@@ -218,7 +244,7 @@ function buildProgressMatches(autoMatches: Match[], revealed: Set<number>, allGr
 
   fixedR32.forEach(([id]) => {
     const match = autoById.get(id)!;
-    visible.set(id, allGroupsRevealed ? { ...match, winner: revealed.has(id) ? match.winner : undefined, hs: revealed.has(id) ? match.hs : undefined, as: revealed.has(id) ? match.as : undefined } : blankMatch(id, "Qual.", "Qual.", "Qualified team", "Qualified team"));
+    visible.set(id, { ...match, winner: revealed.has(id) ? match.winner : undefined, hs: revealed.has(id) ? match.hs : undefined, as: revealed.has(id) ? match.as : undefined });
   });
 
   nextRounds.forEach(([id, a, b]) => {
@@ -241,7 +267,7 @@ function buildManualMatches(baseMatches: Match[], picks: Record<number, string>,
 
   fixedR32.forEach(([id]) => {
     const match = base.get(id)!;
-    matches.set(id, allGroupsRevealed ? { ...match, hs: undefined, as: undefined, winner: picks[id] } : blankMatch(id, "Qual.", "Qual.", "Qualified team", "Qualified team"));
+    matches.set(id, { ...match, hs: undefined, as: undefined, winner: picks[id] });
   });
 
   nextRounds.forEach(([id, a, b]) => {
@@ -263,9 +289,12 @@ function buildManualMatches(baseMatches: Match[], picks: Record<number, string>,
 
 function TeamMark({ team, source }: { team: string; source?: string }) {
   const isPlaceholder = isPlaceholderTeam(team);
+  const flagCode = flagCodes[team];
   return (
     <span className={isPlaceholder ? "team-mark placeholder-team" : "team-mark"}>
-      <span className="flag">{isPlaceholder ? "•" : flags[team] ?? "🏳️"}</span>
+      <span className="flag">
+        {isPlaceholder || !flagCode ? <span>{isPlaceholder ? "•" : flags[team] ?? "🏳️"}</span> : <img src={`https://flagcdn.com/w80/${flagCode}.png`} alt={`${team} flag`} />}
+      </span>
       <span className="team-name">{team}</span>
       {source && <span className="seed-tag">{source}</span>}
     </span>
@@ -276,6 +305,7 @@ function MatchCard({
   match,
   mode,
   suspenseId,
+  suspenseEvent,
   onSimulate,
   onPick,
   allGroupsRevealed
@@ -283,6 +313,7 @@ function MatchCard({
   match: Match;
   mode: Mode;
   suspenseId?: number;
+  suspenseEvent?: string;
   onSimulate: (id: number) => void;
   onPick: (id: number, team: string) => void;
   allGroupsRevealed: boolean;
@@ -308,10 +339,15 @@ function MatchCard({
       </button>
       {mode === "simulation" && !match.winner && (
         <button className="simulate-match" disabled={!canPlay || isSuspense} onClick={() => onSimulate(match.id)}>
-          {isSuspense ? "Crowd is rising..." : "Simulate Match"}
+          {isSuspense ? "Match in progress..." : "Kick Off"}
         </button>
       )}
-      {isSuspense && <div className="energy-bar"><span /></div>}
+      {isSuspense && (
+        <div className="suspense-feed">
+          <span>{suspenseEvent ?? "Kickoff under the lights"}</span>
+          <div className="energy-bar"><i /></div>
+        </div>
+      )}
     </article>
   );
 }
@@ -324,6 +360,7 @@ export default function Home() {
   const [revealedMatches, setRevealedMatches] = useState<Record<number, boolean>>({});
   const [manualPicks, setManualPicks] = useState<Record<number, string>>({});
   const [suspenseId, setSuspenseId] = useState<number>();
+  const [suspenseEvent, setSuspenseEvent] = useState("");
   const [copied, setCopied] = useState(false);
 
   const result = useMemo(() => simulate(seed), [seed]);
@@ -349,6 +386,7 @@ export default function Home() {
     setRevealedMatches({});
     setManualPicks({});
     setSuspenseId(undefined);
+    setSuspenseEvent("");
     setCopied(false);
   }
 
@@ -359,9 +397,14 @@ export default function Home() {
   function simulateMatch(id: number) {
     if (suspenseId) return;
     setSuspenseId(id);
+    const eventSeed = id + seed + revealedSet.size;
+    setSuspenseEvent(matchEventPool[eventSeed % matchEventPool.length]);
+    window.setTimeout(() => setSuspenseEvent(matchEventPool[(eventSeed + 3) % matchEventPool.length]), 900);
+    window.setTimeout(() => setSuspenseEvent(matchEventPool[(eventSeed + 5) % matchEventPool.length]), 1800);
     window.setTimeout(() => {
       setRevealedMatches((matches) => ({ ...matches, [id]: true }));
       setSuspenseId(undefined);
+      setSuspenseEvent("");
     }, 3000);
   }
 
@@ -387,9 +430,12 @@ export default function Home() {
   async function share() {
     const winner = champion || "A champion is waiting to be revealed";
     const url = typeof window !== "undefined" ? window.location.href : "https://github.com/aissadi/worldcup-simulator";
-    const text = `${winner} won my World Cup 2026 simulation 🏆 Try yours here: ${url}`;
-    if (navigator.share) await navigator.share({ title: "World Cup 2026 Simulator", text });
-    else await navigator.clipboard.writeText(text);
+    const text = `${flags[winner] ?? "🏆"} ${winner} won my World Cup 2026 simulation 🏆\n\nI built the bracket from the 48-team format: top 2, best thirds, then the full knockout path.\n\nTry yours here: ${url}`;
+    if (navigator.clipboard) {
+      await navigator.clipboard.writeText(text);
+    } else if (navigator.share) {
+      await navigator.share({ title: "World Cup 2026 Simulator", text });
+    }
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1800);
   }
@@ -408,7 +454,7 @@ export default function Home() {
           </div>
         </div>
         <div className="hero-panel">
-          <div className="trophy-orbit"><Trophy size={70} /></div>
+          <div className={champion ? "trophy-orbit crowned" : "trophy-orbit"}><Trophy size={70} /></div>
           <span>Champion</span>
           <strong>{champion || "Awaiting Final"}</strong>
           {thirdPlaceWinner && <em>Third place: {flags[thirdPlaceWinner]} {thirdPlaceWinner}</em>}
@@ -444,7 +490,7 @@ export default function Home() {
                 {revealed ? table.standings.map((team, place) => {
                   const thirdQualified = place === 2 && result.bestThirds.some((third) => third.name === team.name);
                   return (
-                    <div className={place < 2 ? "standing qualified" : thirdQualified ? "standing third-qualified" : "standing"} key={team.name}>
+                    <div className={place < 2 ? "standing qualified" : thirdQualified ? "standing third-qualified" : "standing"} key={team.name} style={{ animationDelay: `${place * 140}ms` }}>
                       <span>{place + 1}</span>
                       <TeamMark team={team.name} />
                       <em>{team.points} pts</em>
@@ -452,8 +498,7 @@ export default function Home() {
                   );
                 }) : groups[index].teams.map((team) => (
                   <div className="standing ghost" key={team.name}>
-                    <span>{team.flag}</span>
-                    <b>{team.name}</b>
+                    <TeamMark team={team.name} />
                   </div>
                 ))}
               </article>
@@ -466,7 +511,7 @@ export default function Home() {
         <p className="kicker"><Zap size={16} /> Qualified Teams</p>
         <div>
           {allGroupsRevealed ? result.tables.flatMap((table) => table.standings.slice(0, 2)).concat(result.bestThirds).map((team) => (
-            <span key={`${team.group}-${team.name}`}><span>{team.flag}</span>{team.name}<em>{team.group}</em></span>
+            <span className="qualified-chip" key={`${team.group}-${team.name}`}><TeamMark team={team.name} /><em>{team.group}</em></span>
           )) : <strong>Reveal all groups to fill the Round of 32 bracket.</strong>}
         </div>
       </section>
@@ -488,25 +533,25 @@ export default function Home() {
           <div className="branch-column r32-column">
             <h3>Round of 32</h3>
             {roundOf32.slice(0, 8).map((match) => (
-              <MatchCard key={match.id} match={match} mode={mode} suspenseId={suspenseId} allGroupsRevealed={allGroupsRevealed} onSimulate={simulateMatch} onPick={pickWinner} />
+              <MatchCard key={match.id} match={match} mode={mode} suspenseId={suspenseId} suspenseEvent={suspenseEvent} allGroupsRevealed={allGroupsRevealed} onSimulate={simulateMatch} onPick={pickWinner} />
             ))}
           </div>
           <div className="branch-column r16-column">
             <h3>Round of 16</h3>
             {roundOf16.slice(0, 4).map((match) => (
-              <MatchCard key={match.id} match={match} mode={mode} suspenseId={suspenseId} allGroupsRevealed={allGroupsRevealed} onSimulate={simulateMatch} onPick={pickWinner} />
+              <MatchCard key={match.id} match={match} mode={mode} suspenseId={suspenseId} suspenseEvent={suspenseEvent} allGroupsRevealed={allGroupsRevealed} onSimulate={simulateMatch} onPick={pickWinner} />
             ))}
           </div>
           <div className="branch-column qf-column">
             <h3>Quarterfinals</h3>
             {quarterfinals.slice(0, 2).map((match) => (
-              <MatchCard key={match.id} match={match} mode={mode} suspenseId={suspenseId} allGroupsRevealed={allGroupsRevealed} onSimulate={simulateMatch} onPick={pickWinner} />
+              <MatchCard key={match.id} match={match} mode={mode} suspenseId={suspenseId} suspenseEvent={suspenseEvent} allGroupsRevealed={allGroupsRevealed} onSimulate={simulateMatch} onPick={pickWinner} />
             ))}
           </div>
           <div className="branch-column sf-column">
             <h3>Semifinal</h3>
             {semifinals.slice(0, 1).map((match) => (
-              <MatchCard key={match.id} match={match} mode={mode} suspenseId={suspenseId} allGroupsRevealed={allGroupsRevealed} onSimulate={simulateMatch} onPick={pickWinner} />
+              <MatchCard key={match.id} match={match} mode={mode} suspenseId={suspenseId} suspenseEvent={suspenseEvent} allGroupsRevealed={allGroupsRevealed} onSimulate={simulateMatch} onPick={pickWinner} />
             ))}
           </div>
         </div>
@@ -518,11 +563,11 @@ export default function Home() {
           </div>
           <div className="center-match final-center">
             <p>Final</p>
-            <MatchCard match={finalMatch} mode={mode} suspenseId={suspenseId} allGroupsRevealed={allGroupsRevealed} onSimulate={simulateMatch} onPick={pickWinner} />
+            <MatchCard match={finalMatch} mode={mode} suspenseId={suspenseId} suspenseEvent={suspenseEvent} allGroupsRevealed={allGroupsRevealed} onSimulate={simulateMatch} onPick={pickWinner} />
           </div>
           <div className="center-match third-center">
             <p>3rd Place Match</p>
-            <MatchCard match={thirdPlaceMatch} mode={mode} suspenseId={suspenseId} allGroupsRevealed={allGroupsRevealed} onSimulate={simulateMatch} onPick={pickWinner} />
+            <MatchCard match={thirdPlaceMatch} mode={mode} suspenseId={suspenseId} suspenseEvent={suspenseEvent} allGroupsRevealed={allGroupsRevealed} onSimulate={simulateMatch} onPick={pickWinner} />
           </div>
         </div>
 
@@ -530,25 +575,25 @@ export default function Home() {
           <div className="branch-column sf-column">
             <h3>Semifinal</h3>
             {semifinals.slice(1, 2).map((match) => (
-              <MatchCard key={match.id} match={match} mode={mode} suspenseId={suspenseId} allGroupsRevealed={allGroupsRevealed} onSimulate={simulateMatch} onPick={pickWinner} />
+              <MatchCard key={match.id} match={match} mode={mode} suspenseId={suspenseId} suspenseEvent={suspenseEvent} allGroupsRevealed={allGroupsRevealed} onSimulate={simulateMatch} onPick={pickWinner} />
             ))}
           </div>
           <div className="branch-column qf-column">
             <h3>Quarterfinals</h3>
             {quarterfinals.slice(2, 4).map((match) => (
-              <MatchCard key={match.id} match={match} mode={mode} suspenseId={suspenseId} allGroupsRevealed={allGroupsRevealed} onSimulate={simulateMatch} onPick={pickWinner} />
+              <MatchCard key={match.id} match={match} mode={mode} suspenseId={suspenseId} suspenseEvent={suspenseEvent} allGroupsRevealed={allGroupsRevealed} onSimulate={simulateMatch} onPick={pickWinner} />
             ))}
           </div>
           <div className="branch-column r16-column">
             <h3>Round of 16</h3>
             {roundOf16.slice(4, 8).map((match) => (
-              <MatchCard key={match.id} match={match} mode={mode} suspenseId={suspenseId} allGroupsRevealed={allGroupsRevealed} onSimulate={simulateMatch} onPick={pickWinner} />
+              <MatchCard key={match.id} match={match} mode={mode} suspenseId={suspenseId} suspenseEvent={suspenseEvent} allGroupsRevealed={allGroupsRevealed} onSimulate={simulateMatch} onPick={pickWinner} />
             ))}
           </div>
           <div className="branch-column r32-column">
             <h3>Round of 32</h3>
             {roundOf32.slice(8, 16).map((match) => (
-              <MatchCard key={match.id} match={match} mode={mode} suspenseId={suspenseId} allGroupsRevealed={allGroupsRevealed} onSimulate={simulateMatch} onPick={pickWinner} />
+              <MatchCard key={match.id} match={match} mode={mode} suspenseId={suspenseId} suspenseEvent={suspenseEvent} allGroupsRevealed={allGroupsRevealed} onSimulate={simulateMatch} onPick={pickWinner} />
             ))}
           </div>
         </div>
@@ -565,6 +610,7 @@ export default function Home() {
                   match={match}
                   mode={mode}
                   suspenseId={suspenseId}
+                  suspenseEvent={suspenseEvent}
                   allGroupsRevealed={allGroupsRevealed}
                   onSimulate={simulateMatch}
                   onPick={pickWinner}
