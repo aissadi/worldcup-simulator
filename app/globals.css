@@ -660,28 +660,40 @@ h2 {
 
 .bracket-screen {
   max-width: 100%;
+  min-height: calc(100vh - 92px);
+  height: calc(100vh - 92px);
   justify-content: flex-start;
+  overflow: visible;
 }
 
 .bracket-scroll {
   width: 100%;
-  max-height: calc(100vh - 236px);
-  overflow-x: auto;
-  overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: calc(100vh - 252px);
+  overflow: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
+  touch-action: pan-x pan-y pinch-zoom;
   padding: 8px 0 18px;
   scrollbar-color: var(--gold) rgba(255, 255, 255, 0.08);
 }
 
+.bracket-canvas {
+  position: relative;
+  min-width: 1600px;
+  min-height: 2200px;
+}
+
 .bracket-stage {
-  width: max-content;
-  min-width: 1200px;
-  min-height: 1320px;
+  width: 1600px;
+  min-width: 1600px;
+  min-height: 2200px;
   display: flex;
   align-items: flex-start;
   gap: 18px;
   padding: 18px;
+  transform-origin: top left;
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 28px;
   background:
@@ -697,6 +709,25 @@ h2 {
   font-size: 13px;
   font-weight: 900;
   text-transform: uppercase;
+}
+
+.zoom-controls {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.zoom-controls button {
+  min-height: 44px;
+  border: 1px solid rgba(248, 200, 78, 0.28);
+  border-radius: 999px;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 12px;
+  font-weight: 1000;
+  text-transform: uppercase;
+  touch-action: manipulation;
+  cursor: pointer;
 }
 
 .bracket-branch {
@@ -1330,7 +1361,7 @@ h2 {
 @media (max-width: 719px) {
   .bracket-scroll {
     margin: 0 -12px;
-    max-height: calc(100vh - 250px);
+    height: calc(100vh - 276px);
     padding: 8px 12px 18px;
   }
 
