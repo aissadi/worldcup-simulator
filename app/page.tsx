@@ -4,16 +4,18 @@ import { ChevronLeft, House, Share2, Sparkles, Trophy, Volume2, Zap } from "luci
 import { useEffect, useMemo, useState } from "react";
 import { languageOptions, locales, type LocaleCode } from "../locales";
 
-type Phase = "home" | "tournamentGroup" | "groupSelect" | "groupReveal" | "matchSelect" | "predictor" | "knockout" | "roundSet" | "champion";
+type Phase = "home" | "tournamentGroup" | "groupSelect" | "groupReveal" | "matchSelect" | "predictor" | "knockout" | "roundSet" | "champion" | "builderGroup" | "builderThirds" | "builderBracket";
 type Team = { name: string; rating: number; group: string; flag: string; code?: string };
 type Group = { id: string; teams: Team[] };
 type Standing = Team & { played: number; won: number; drawn: number; lost: number; gf: number; ga: number; gd: number; points: number };
 type Slot = { source: string; team: string };
 type Match = { id: number; home: string; away: string; homeSource: string; awaySource: string; hs: number; as: number; winner: string; label: string };
-type Flow = "full" | "group" | "singleMatch" | "knockout";
+type Flow = "full" | "group" | "singleMatch" | "knockout" | "manual";
 type RoundKey = "roundOf32" | "roundOf16" | "quarterfinals" | "semifinals" | "thirdPlaceMatch" | "final";
 type RoundSetKey = "roundOf16Set" | "quarterfinalsSet" | "semifinalsSet" | "finalSet";
 type LocaleText = (typeof locales)[LocaleCode];
+type BuilderPick = { first?: string; second?: string; third?: string };
+type ManualMatch = { id: number; home?: string; away?: string; homeSource: string; awaySource: string; winner?: string; label: string; ready: boolean };
 
 const flagEmoji: Record<string, string> = {
   "Mexico": "🇲🇽", "South Africa": "🇿🇦", "South Korea": "🇰🇷", "Czechia": "🇨🇿",
@@ -97,6 +99,7 @@ const bracketRows = new Map<number, { row: number; span: number }>([
 const stageKeys = ["roundOf32", "roundOf16", "quarterfinals", "semifinals"] as const;
 
 const dependencyByMatch = new Map<number, readonly [number, number]>(nextRounds.map(([id, a, b]) => [id, [a, b] as const]));
+const allTeams = groups.flatMap((group) => group.teams);
 
 function rngFrom(seed: number) {
   let value = seed >>> 0;
@@ -250,6 +253,81 @@ function buildGroupPredictionMatches(seed: number) {
   }));
 }
 
+function teamByName(name?: string) {
+  return allTeams.find((item) => item.name === name);
+}
+
+function buildManualFirstSlots(picks: Record<string, BuilderPick>) {
+  const slots = new Map<string, Slot>();
+  groups.forEach((group) => {
+    const pick = picks[group.id] || {};
+    if (pick.first) slots.set(`1${group.id}`, { source: `1${group.id}`, team: pick.first });
+    if (pick.second) slots.set(`2${group.id}`, { source: `2${group.id}`, team: pick.second });
+    if (pick.third) slots.set(`3${group.id}`, { source: `3${group.id}`, team: pick.third });
+  });
+  return slots;
+}
+
+function buildManualThirdAssignments(picks: Record<string, BuilderPick>, thirdGroups: string[]) {
+  const selected = thirdGroups
+    .map((groupId) => {
+      const name = picks[groupId]?.third;
+      const selectedTeam = teamByName(name);
+      if (!selectedTeam) return null;
+      return { ...selectedTeam, played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, gd: 0, points: 0 } as Standing;
+    })
+    .filter((item): item is Standing => Boolean(item));
+  return assignThirdPlaceSlots(selected);
+}
+
+function buildManualMatches(picks: Record<string, BuilderPick>, thirdGroups: string[], winners: Record<number, string>) {
+  const slots = buildManualFirstSlots(picks);
+  const thirdAssignments = buildManualThirdAssignments(picks, thirdGroups);
+  const manualMatches = new Map<number, ManualMatch>();
+  const resolve = (code: string): Slot | undefined => {
+    if (code.startsWith("3") && code.length > 2) {
+      const picked = thirdAssignments.get(code);
+      return picked ? { source: `3${picked.group}`, team: picked.name } : undefined;
+    }
+    return slots.get(code);
+  };
+
+  fixedR32.forEach(([id, a, b]) => {
+    const home = resolve(a);
+    const away = resolve(b);
+    manualMatches.set(id, {
+      id,
+      home: home?.team,
+      away: away?.team,
+      homeSource: home?.source || a,
+      awaySource: away?.source || b,
+      winner: winners[id],
+      label: `M${id}`,
+      ready: Boolean(home?.team && away?.team)
+    });
+  });
+
+  nextRounds.forEach(([id, a, b]) => {
+    const first = manualMatches.get(a);
+    const second = manualMatches.get(b);
+    const thirdPlace = id === 103;
+    const home = thirdPlace && first?.winner ? (first.winner === first.home ? first.away : first.home) : winners[a];
+    const away = thirdPlace && second?.winner ? (second.winner === second.home ? second.away : second.home) : winners[b];
+    manualMatches.set(id, {
+      id,
+      home,
+      away,
+      homeSource: `${thirdPlace ? "L" : "W"}${a}`,
+      awaySource: `${thirdPlace ? "L" : "W"}${b}`,
+      winner: winners[id],
+      label: `M${id}`,
+      ready: Boolean(home && away)
+    });
+  });
+
+  return manualMatches;
+}
+
 function team(name: string) {
   return groups.flatMap((group) => group.teams).find((item) => item.name === name)!;
 }
@@ -354,6 +432,10 @@ export default function Home() {
   const [roundSetMessage, setRoundSetMessage] = useState("");
   const [copied, setCopied] = useState(false);
   const [revealedMatchIds, setRevealedMatchIds] = useState<Set<number>>(new Set());
+  const [builderGroupIndex, setBuilderGroupIndex] = useState(0);
+  const [builderPicks, setBuilderPicks] = useState<Record<string, BuilderPick>>({});
+  const [builderThirdGroups, setBuilderThirdGroups] = useState<string[]>([]);
+  const [manualWinners, setManualWinners] = useState<Record<number, string>>({});
 
   const result = useMemo(() => simulate(seed), [seed]);
   const groupPredictionMatches = useMemo(() => buildGroupPredictionMatches(seed), [seed]);
@@ -366,6 +448,9 @@ export default function Home() {
   const champion = result.champion;
   const thirdQualified = new Set(result.bestThirds.map((item) => item.name));
   const matchById = new Map(knockoutMatches.map((match, index) => [match.id, { match, index }]));
+  const manualMatches = buildManualMatches(builderPicks, builderThirdGroups, manualWinners);
+  const manualChampion = manualWinners[104];
+  const displayChampion = flow === "manual" && manualChampion ? manualChampion : champion;
 
   useEffect(() => {
     const saved = window.localStorage.getItem("worldcup-language") as LocaleCode | null;
@@ -400,6 +485,10 @@ export default function Home() {
     setRoundSetMessage("");
     setCopied(false);
     setRevealedMatchIds(new Set());
+    setBuilderGroupIndex(0);
+    setBuilderPicks({});
+    setBuilderThirdGroups([]);
+    setManualWinners({});
   }
 
   function openHomeCard(nextFlow: Flow) {
@@ -414,6 +503,13 @@ export default function Home() {
     if (nextFlow === "group") setPhase("groupSelect");
     if (nextFlow === "singleMatch") setPhase("matchSelect");
     if (nextFlow === "knockout") setPhase("knockout");
+    if (nextFlow === "manual") {
+      setBuilderGroupIndex(0);
+      setBuilderPicks({});
+      setBuilderThirdGroups([]);
+      setManualWinners({});
+      setPhase("builderGroup");
+    }
   }
 
   function revealGroup() {
@@ -527,7 +623,7 @@ export default function Home() {
 
   function shareResult() {
     const url = typeof window !== "undefined" ? window.location.href : "https://github.com/aissadi/worldcup-simulator";
-    share(tr(t.shareResultText, { team: champion, url }));
+    share(tr(t.shareResultText, { team: displayChampion, url }));
   }
 
   function shareWinner() {
@@ -573,6 +669,53 @@ export default function Home() {
     const match = item.match;
     if (isKnockoutMatchAvailable(matchId)) return side === "home" ? match.home : match.away;
     return side === "home" ? match.homeSource : match.awaySource;
+  }
+
+  function setBuilderPick(groupId: string, place: keyof BuilderPick, name: string) {
+    setBuilderPicks((previous) => {
+      const nextGroup = { ...(previous[groupId] || {}) };
+      const entries = Object.entries(nextGroup).filter(([key, value]) => key !== place && value === name);
+      entries.forEach(([key]) => delete nextGroup[key as keyof BuilderPick]);
+      nextGroup[place] = nextGroup[place] === name ? undefined : name;
+      return { ...previous, [groupId]: nextGroup };
+    });
+  }
+
+  function builderGroupComplete(groupId: string) {
+    const pick = builderPicks[groupId];
+    return Boolean(pick?.first && pick.second);
+  }
+
+  function continueBuilderGroup() {
+    if (builderGroupIndex < groups.length - 1) {
+      setBuilderGroupIndex(builderGroupIndex + 1);
+      return;
+    }
+    setPhase("builderThirds");
+  }
+
+  function toggleBuilderThird(groupId: string) {
+    setBuilderThirdGroups((previous) => {
+      if (previous.includes(groupId)) return previous.filter((item) => item !== groupId);
+      if (previous.length >= 8) return previous;
+      return [...previous, groupId];
+    });
+  }
+
+  function chooseManualWinner(matchId: number, winner: string) {
+    const dependentIds = nextRounds.filter(([, a, b]) => a === matchId || b === matchId).map(([id]) => id);
+    setManualWinners((previous) => {
+      const next = { ...previous, [matchId]: winner };
+      function clearDownstream(ids: number[]) {
+        ids.forEach((id) => {
+          delete next[id];
+          const more = nextRounds.filter(([, a, b]) => a === id || b === id).map(([nextId]) => nextId);
+          clearDownstream(more);
+        });
+      }
+      clearDownstream(dependentIds);
+      return next;
+    });
   }
 
   function BracketCard({ matchId, compact = false }: { matchId: number; compact?: boolean }) {
@@ -623,6 +766,52 @@ export default function Home() {
     );
   }
 
+  function ManualBracketCard({ matchId, compact = false }: { matchId: number; compact?: boolean }) {
+    const match = manualMatches.get(matchId);
+    if (!match) return null;
+    const placement = bracketRows.get(matchId);
+    const winner = match.winner;
+    return (
+      <div
+        className={`${compact ? "bracket-card manual compact" : "bracket-card manual"} ${winner ? "revealed" : ""}`}
+        style={placement ? { gridRow: `${placement.row} / span ${placement.span}` } : undefined}
+      >
+        <span>{tr(t.matchNumber, { number: String(match.id) })}</span>
+        {(["home", "away"] as const).map((side) => {
+          const name = match[side];
+          return (
+            <button
+              type="button"
+              className={winner === name ? "bracket-team winner" : "bracket-team"}
+              key={side}
+              onClick={() => name && match.ready && chooseManualWinner(match.id, name)}
+              disabled={!name || !match.ready}
+            >
+              {name ? flag(name) : <i />}
+              <strong>{name || (side === "home" ? match.homeSource : match.awaySource)}</strong>
+            </button>
+          );
+        })}
+        <small>{winner ? `${t.winner}: ${winner}` : match.ready ? t.tapWinner : t.locked}</small>
+      </div>
+    );
+  }
+
+  function ManualBranch({ side }: { side: "left" | "right" }) {
+    return (
+      <div className={`bracket-branch ${side}`}>
+        {bracketLayout[side].map((column, index) => (
+          <div className="bracket-stage-column" key={`manual-${side}-${index}`}>
+            <h3>{t[stageKeys[index]]}</h3>
+            <div className="bracket-column">
+              {column.map((matchId) => <ManualBracketCard key={matchId} matchId={matchId} compact={index > 1} />)}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   const groupScreen = (
     <section className="screen">
       <button className="back" onClick={() => setPhase(flow === "group" ? "groupSelect" : "home")}><ChevronLeft size={18} /> {t.back}</button>
@@ -665,12 +854,83 @@ export default function Home() {
           <h1>{t.homeTitle}</h1>
           <p className="subtitle">{t.homeSubtitle}</p>
           <div className="home-grid">
-            <button className="home-card" onClick={() => openHomeCard("full")}><b>{t.startFullTournament}</b></button>
-            <button className="home-card" onClick={() => openHomeCard("group")}><b>{t.chooseGroup}</b></button>
-            <button className="home-card" onClick={() => openHomeCard("singleMatch")}><b>{t.predictOneMatch}</b></button>
-            <button className="home-card" onClick={() => openHomeCard("knockout")}><b>{t.knockoutStagePredictions}</b></button>
-            <button className="home-card" onClick={() => { reset(seed + 1); setFlow("knockout"); setPhase("knockout"); }}><b>{t.buildYourPredictions}</b></button>
+            <button className="home-card" onClick={() => openHomeCard("full")}><b>{t.startFullTournament}</b><span>{t.aiMode}</span></button>
+            <button className="home-card" onClick={() => openHomeCard("group")}><b>{t.chooseGroup}</b><span>{t.aiMode}</span></button>
+            <button className="home-card" onClick={() => openHomeCard("singleMatch")}><b>{t.predictOneMatch}</b><span>{t.aiMode}</span></button>
+            <button className="home-card" onClick={() => openHomeCard("knockout")}><b>{t.knockoutStagePredictions}</b><span>{t.aiMode}</span></button>
+            <button className="home-card" onClick={() => openHomeCard("manual")}><b>{t.buildYourPredictions}</b><span>{t.manualBuilderMode}</span></button>
           </div>
+        </section>
+      )}
+
+      {phase === "builderGroup" && (
+        <section className="screen">
+          <p className="kicker">{t.manualBuilderMode}</p>
+          <h2>{t.group} {groups[builderGroupIndex].id}</h2>
+          <p className="step">{t.selectGroupFinishers}</p>
+          <div className="builder-board">
+            {groups[builderGroupIndex].teams.map((item) => {
+              const pick = builderPicks[groups[builderGroupIndex].id] || {};
+              return (
+                <article className="builder-team" key={item.name}>
+                  <div>{flag(item.name)}<strong>{item.name}</strong></div>
+                  <div className="builder-pick-row">
+                    <button type="button" className={pick.first === item.name ? "active" : ""} onClick={() => setBuilderPick(groups[builderGroupIndex].id, "first", item.name)}>{t.firstPlace}</button>
+                    <button type="button" className={pick.second === item.name ? "active" : ""} onClick={() => setBuilderPick(groups[builderGroupIndex].id, "second", item.name)}>{t.secondPlace}</button>
+                    <button type="button" className={pick.third === item.name ? "active" : ""} onClick={() => setBuilderPick(groups[builderGroupIndex].id, "third", item.name)}>{t.thirdCandidate}</button>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+          <button className="primary" disabled={!builderGroupComplete(groups[builderGroupIndex].id)} onClick={continueBuilderGroup}>{builderGroupIndex === groups.length - 1 ? t.chooseBestThirds : t.nextGroup}</button>
+        </section>
+      )}
+
+      {phase === "builderThirds" && (
+        <section className="screen">
+          <button className="back" onClick={() => setPhase("builderGroup")}><ChevronLeft size={18} /> {t.back}</button>
+          <p className="kicker">{t.manualBuilderMode}</p>
+          <h2>{t.chooseBestThirds}</h2>
+          <p className="step">{tr(t.selectedCount, { count: String(builderThirdGroups.length), total: "8" })}</p>
+          <div className="builder-board">
+            {groups.map((group) => {
+              const name = builderPicks[group.id]?.third;
+              return (
+                <button className={builderThirdGroups.includes(group.id) ? "third-select active" : "third-select"} disabled={!name} key={group.id} onClick={() => toggleBuilderThird(group.id)}>
+                  <span>{t.group} {group.id}</span>
+                  {name ? flag(name) : null}
+                  <strong>{name || t.noThirdSelected}</strong>
+                </button>
+              );
+            })}
+          </div>
+          <button className="primary" disabled={builderThirdGroups.length !== 8} onClick={() => setPhase("builderBracket")}>{t.buildBracket}</button>
+        </section>
+      )}
+
+      {phase === "builderBracket" && (
+        <section className="screen bracket-screen">
+          <p className="kicker">{t.manualBuilderMode}</p>
+          <h2>{t.buildYourPredictions}</h2>
+          <p className="step">{t.tapWinner}</p>
+          <div className="bracket-scroll">
+            <div className="bracket-stage">
+              <ManualBranch side="left" />
+              <div className="bracket-center">
+                <h3>{t.final}</h3>
+                <div className="center-logo-wrap">
+                  <img src="/worldcup-2026-logo.png" alt={t.logoAlt} />
+                  <span>{t.trophyPath}</span>
+                </div>
+                <ManualBracketCard matchId={104} compact />
+                <h3>{t.thirdPlaceShort}</h3>
+                <ManualBracketCard matchId={103} compact />
+              </div>
+              <ManualBranch side="right" />
+            </div>
+          </div>
+          {manualChampion && <button className="primary" onClick={() => setPhase("champion")}>{t.revealChampion}</button>}
         </section>
       )}
 
@@ -690,7 +950,7 @@ export default function Home() {
       {phase === "matchSelect" && (
         <section className="screen">
           <button className="back" onClick={() => setPhase("home")}><ChevronLeft size={18} /> {t.back}</button>
-          <p className="kicker">{t.chooseOneMatch}</p>
+          <p className="kicker">{t.aiMode}</p>
           <h2>{t.matchPredictor}</h2>
           <p className="step">{t.groupStageMatchesOnly}</p>
           <div className="match-list">
@@ -708,7 +968,7 @@ export default function Home() {
 
       {phase === "knockout" && (
         <section className="screen bracket-screen">
-          <p className="kicker">{t.fullKnockoutPath}</p>
+          <p className="kicker">{t.aiMode}</p>
           <h2>{t.knockoutBracket}</h2>
           <p className="step">{t.tapAnyLiveMatch}</p>
           <div className="bracket-scroll">
@@ -771,7 +1031,7 @@ export default function Home() {
       {phase === "champion" && (
         <section className="screen champion-screen">
           <div className="trophy-glow"><Trophy size={88} /></div>
-          <h2>{flag(champion, "large")} {tr(t.championLine, { team: champion })}</h2>
+          <h2>{flag(displayChampion, "large")} {tr(t.championLine, { team: displayChampion })}</h2>
           <button className="primary" onClick={shareResult}><Share2 size={18} /> {t.shareMyResult}</button>
           <button className="secondary" onClick={() => reset()}><Sparkles size={18} /> {t.tryAgain}</button>
           {copied && <p className="copied">{t.copied}</p>}
