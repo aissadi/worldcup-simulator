@@ -60,6 +60,7 @@ const ar = {
   knockoutBracket: "مسار الأدوار الإقصائية",
   fullKnockoutPath: "المسار الكامل نحو النهائي",
   tapAnyLiveMatch: "اضغط على أي مباراة متاحة",
+  swipeToExplore: "اسحب لاستكشاف المسار الكامل",
   locked: "مقفلة",
   winner: "الفائز",
   trophyPath: "طريق الكأس",

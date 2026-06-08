@@ -60,6 +60,7 @@ const en = {
   knockoutBracket: "Knockout Bracket",
   fullKnockoutPath: "Full Knockout Path",
   tapAnyLiveMatch: "Tap any live match",
+  swipeToExplore: "Swipe to explore the full bracket",
   locked: "Locked",
   winner: "Winner",
   trophyPath: "Trophy Path",

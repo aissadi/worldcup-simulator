@@ -60,6 +60,7 @@ const es = {
   knockoutBracket: "Cuadro de Eliminatorias",
   fullKnockoutPath: "Ruta Completa de Eliminatorias",
   tapAnyLiveMatch: "Toca cualquier partido disponible",
+  swipeToExplore: "Desliza para explorar todo el cuadro",
   locked: "Bloqueado",
   winner: "Ganador",
   trophyPath: "Ruta al Trofeo",

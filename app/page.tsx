@@ -924,6 +924,7 @@ export default function Home() {
           <p className="kicker">{t.manualBuilderMode}</p>
           <h2>{t.buildYourPredictions}</h2>
           <p className="step">{t.tapWinner}</p>
+          <p className="bracket-help">{t.swipeToExplore}</p>
           <div className="bracket-scroll">
             <div className="bracket-stage">
               <ManualBranch side="left" />
@@ -981,6 +982,7 @@ export default function Home() {
           <p className="kicker">{t.aiMode}</p>
           <h2>{t.knockoutBracket}</h2>
           <p className="step">{t.tapAnyLiveMatch}</p>
+          <p className="bracket-help">{t.swipeToExplore}</p>
           <div className="bracket-scroll">
             <div className="bracket-stage">
               <BracketBranch side="left" />
