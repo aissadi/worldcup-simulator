@@ -84,6 +84,17 @@ const bracketLayout = {
   left: [[73, 75, 74, 77, 83, 84, 81, 82], [89, 90, 93, 94], [97, 98], [101]],
   right: [[76, 78, 79, 80, 86, 88, 85, 87], [91, 92, 95, 96], [99, 100], [102]]
 } as const;
+const bracketRows = new Map<number, { row: number; span: number }>([
+  [73, { row: 1, span: 2 }], [75, { row: 3, span: 2 }], [74, { row: 5, span: 2 }], [77, { row: 7, span: 2 }],
+  [83, { row: 9, span: 2 }], [84, { row: 11, span: 2 }], [81, { row: 13, span: 2 }], [82, { row: 15, span: 2 }],
+  [89, { row: 2, span: 2 }], [90, { row: 6, span: 2 }], [93, { row: 10, span: 2 }], [94, { row: 14, span: 2 }],
+  [97, { row: 4, span: 2 }], [98, { row: 12, span: 2 }], [101, { row: 8, span: 2 }],
+  [76, { row: 1, span: 2 }], [78, { row: 3, span: 2 }], [79, { row: 5, span: 2 }], [80, { row: 7, span: 2 }],
+  [86, { row: 9, span: 2 }], [88, { row: 11, span: 2 }], [85, { row: 13, span: 2 }], [87, { row: 15, span: 2 }],
+  [91, { row: 2, span: 2 }], [92, { row: 6, span: 2 }], [95, { row: 10, span: 2 }], [96, { row: 14, span: 2 }],
+  [99, { row: 4, span: 2 }], [100, { row: 12, span: 2 }], [102, { row: 8, span: 2 }]
+]);
+const stageKeys = ["roundOf32", "roundOf16", "quarterfinals", "semifinals"] as const;
 
 const dependencyByMatch = new Map<number, readonly [number, number]>(nextRounds.map(([id, a, b]) => [id, [a, b] as const]));
 
@@ -318,7 +329,7 @@ function AppHeader({
       <img className="wc-logo" src="/worldcup-2026-logo.png" alt={t.logoAlt} />
       <div className="language-switcher" aria-label={t.languageLabel}>
         {languageOptions.map((option) => (
-          <button className={language === option.code ? "active" : ""} key={option.code} onClick={() => onLanguageChange(option.code)}>
+          <button type="button" className={language === option.code ? "active" : ""} key={option.code} onClick={() => onLanguageChange(option.code)}>
             <span>{option.flag}</span>
             <b>{option.label}</b>
           </button>
@@ -568,8 +579,15 @@ export default function Home() {
     const revealed = revealedMatchIds.has(matchId);
     const homeName = sourceLabel(matchId, "home");
     const awayName = sourceLabel(matchId, "away");
+    const placement = bracketRows.get(matchId);
     return (
-      <button className={`${compact ? "bracket-card compact" : "bracket-card"} ${revealed ? "revealed" : ""}`} onClick={() => openKnockoutMatch(matchId)} disabled={!available}>
+      <button
+        type="button"
+        className={`${compact ? "bracket-card compact" : "bracket-card"} ${revealed ? "revealed" : ""}`}
+        style={placement ? { gridRow: `${placement.row} / span ${placement.span}` } : undefined}
+        onClick={() => openKnockoutMatch(matchId)}
+        disabled={!available}
+      >
         <span>{tr(t.matchNumber, { number: String(match.id) })}</span>
         <div className={revealed && match.winner === match.home ? "bracket-team winner" : "bracket-team"}>
           {available ? flag(homeName) : <i />}
@@ -590,8 +608,11 @@ export default function Home() {
     return (
       <div className={`bracket-branch ${side}`}>
         {bracketLayout[side].map((column, index) => (
-          <div className="bracket-column" key={`${side}-${index}`}>
-            {column.map((matchId) => <BracketCard key={matchId} matchId={matchId} compact={index > 1} />)}
+          <div className="bracket-stage-column" key={`${side}-${index}`}>
+            <h3>{t[stageKeys[index]]}</h3>
+            <div className="bracket-column">
+              {column.map((matchId) => <BracketCard key={matchId} matchId={matchId} compact={index > 1} />)}
+            </div>
           </div>
         ))}
       </div>
@@ -635,13 +656,16 @@ export default function Home() {
 
       {phase === "home" && (
         <section className="screen landing">
-          <p className="kicker"><Sparkles size={16} /> {t.homeKicker}</p>
-          <h1>{t.appTitle}</h1>
+          <img className="landing-logo" src="/worldcup-2026-logo.png" alt={t.logoAlt} />
+          <div className="landing-graphic" aria-hidden="true"><Trophy size={74} /><span /></div>
+          <h1>{t.homeTitle}</h1>
+          <p className="subtitle">{t.homeSubtitle}</p>
           <div className="home-grid">
-            <button className="home-card" onClick={() => openHomeCard("full")}><b>{t.fullTournament}</b><span>{t.fullTournamentDescription}</span></button>
-            <button className="home-card" onClick={() => openHomeCard("group")}><b>{t.groupReveal}</b><span>{t.groupRevealDescription}</span></button>
-            <button className="home-card" onClick={() => openHomeCard("singleMatch")}><b>{t.matchPredictor}</b><span>{t.matchPredictorDescription}</span></button>
-            <button className="home-card" onClick={() => openHomeCard("knockout")}><b>{t.knockoutSimulator}</b><span>{t.knockoutSimulatorDescription}</span></button>
+            <button className="home-card" onClick={() => openHomeCard("full")}><b>{t.startFullTournament}</b></button>
+            <button className="home-card" onClick={() => openHomeCard("group")}><b>{t.chooseGroup}</b></button>
+            <button className="home-card" onClick={() => openHomeCard("singleMatch")}><b>{t.predictOneMatch}</b></button>
+            <button className="home-card" onClick={() => openHomeCard("knockout")}><b>{t.knockoutStagePredictions}</b></button>
+            <button className="home-card" onClick={() => { reset(seed + 1); setFlow("knockout"); setPhase("knockout"); }}><b>{t.buildYourPredictions}</b></button>
           </div>
         </section>
       )}
@@ -687,11 +711,13 @@ export default function Home() {
             <div className="bracket-stage">
               <BracketBranch side="left" />
               <div className="bracket-center">
+                <h3>{t.final}</h3>
                 <div className="center-logo-wrap">
                   <img src="/worldcup-2026-logo.png" alt={t.logoAlt} />
                   <span>{t.trophyPath}</span>
                 </div>
                 <BracketCard matchId={104} compact />
+                <h3>{t.thirdPlaceShort}</h3>
                 <BracketCard matchId={103} compact />
               </div>
               <BracketBranch side="right" />
@@ -705,14 +731,14 @@ export default function Home() {
           <button className="back" onClick={() => setPhase(flow === "singleMatch" ? "matchSelect" : "knockout")}><ChevronLeft size={18} /> {flow === "knockout" ? t.backToKnockoutBracket : t.backToTournament}</button>
           <p className="step">{t.aiMatchPrediction} · {flow === "singleMatch" ? currentMatch.label : tr(t.matchNumber, { number: String(currentMatch.id) })}</p>
           <div className={predictionLoading ? "versus-card suspense" : "versus-card"}>
-            <div className={predictionReady && currentMatch.winner === currentMatch.home ? "team-side winner" : "team-side"}>{flag(currentMatch.home, "large")}<strong>{currentMatch.home}</strong>{predictionReady && <b>{currentMatch.hs}</b>}</div>
+            <div className={predictionReady && currentMatch.winner === currentMatch.home ? "team-side winner" : "team-side"}>{flag(currentMatch.home, "large")}<strong>{currentMatch.home}</strong>{predictionReady && flow === "singleMatch" && <b>{currentMatch.hs}</b>}</div>
             <span className="vs">{t.versus}</span>
-            <div className={predictionReady && currentMatch.winner === currentMatch.away ? "team-side winner" : "team-side"}>{flag(currentMatch.away, "large")}<strong>{currentMatch.away}</strong>{predictionReady && <b>{currentMatch.as}</b>}</div>
+            <div className={predictionReady && currentMatch.winner === currentMatch.away ? "team-side winner" : "team-side"}>{flag(currentMatch.away, "large")}<strong>{currentMatch.away}</strong>{predictionReady && flow === "singleMatch" && <b>{currentMatch.as}</b>}</div>
             {predictionLoading && <div className="suspense-box"><strong>{countdown}</strong><span>{predictionMessage}</span><i /></div>}
           </div>
-          {predictionReady && <div className="prediction-result"><Trophy size={26} /><strong>{flag(currentMatch.winner)} {currentMatch.winner} {t.predictedToWin}</strong><em>{t.reason}: {t.predictionReasons[predictionReasonIndex(currentMatch)]}</em></div>}
+          {predictionReady && <div className="prediction-result"><Trophy size={26} /><strong>{t.winner}: {flag(currentMatch.winner)} {currentMatch.winner}</strong>{flow === "singleMatch" && <em>{t.reason}: {t.predictionReasons[predictionReasonIndex(currentMatch)]}</em>}</div>}
           {!predictionReady ? <button className="primary" disabled={predictionLoading || matchRevealed} onClick={startPrediction}>{matchRevealed ? t.winner : predictionLoading ? t.predicting : t.aiPredictWinner}</button> : <button className="primary" onClick={matchRevealed ? () => setPhase("knockout") : returnAfterPrediction}>{matchRevealed ? t.backToKnockoutBracket : t.sendWinnerToBracket}</button>}
-          {predictionReady && <button className="secondary" onClick={sharePrediction}><Share2 size={18} /> {t.sharePrediction}</button>}
+          {predictionReady && flow === "singleMatch" && <button className="secondary" onClick={sharePrediction}><Share2 size={18} /> {t.sharePrediction}</button>}
           {flow === "knockout" && !matchRevealed && <button className="secondary" onClick={() => setPhase("knockout")}><ChevronLeft size={18} /> {t.backToKnockoutBracket}</button>}
           {flow === "singleMatch" && predictionReady && <button className="secondary" onClick={() => openPredictor(Math.min(matchIndex + 1, groupPredictionMatches.length - 1), "singleMatch")}>{t.nextMatch}</button>}
           {copied && <p className="copied">{t.copied}</p>}

@@ -22,6 +22,8 @@ html, body {
 button { font: inherit; }
 
 .app {
+  position: relative;
+  overflow-x: hidden;
   min-height: 100vh;
   display: grid;
   place-items: stretch;
@@ -32,6 +34,20 @@ button { font: inherit; }
     linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 34%),
     repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.025) 0 1px, transparent 1px 78px),
     #040504;
+}
+
+.app::before {
+  content: "";
+  position: fixed;
+  inset: 70px -18% -16%;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 50% 92%, rgba(34, 229, 140, 0.28), transparent 38%),
+    radial-gradient(circle at 20% 26%, rgba(248, 200, 78, 0.22), transparent 28%),
+    radial-gradient(circle at 82% 22%, rgba(255, 255, 255, 0.12), transparent 24%);
+  filter: blur(4px);
+  animation: stadiumGlow 5.5s ease-in-out infinite alternate;
 }
 
 .app-header {
@@ -116,6 +132,8 @@ button { font: inherit; }
 }
 
 .screen {
+  position: relative;
+  z-index: 1;
   width: 100%;
   max-width: 560px;
   min-height: calc(100vh - 110px);
@@ -128,7 +146,45 @@ button { font: inherit; }
 }
 
 .landing {
+  justify-content: flex-start;
   text-align: left;
+  padding-top: 10px;
+}
+
+.landing-logo {
+  width: auto;
+  height: 104px;
+  max-width: 170px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 34px rgba(248, 200, 78, 0.24));
+}
+
+.landing-graphic {
+  position: relative;
+  width: 140px;
+  height: 140px;
+  display: grid;
+  place-items: center;
+  margin: 4px 0 -6px;
+  border-radius: 999px;
+  color: #061009;
+  background: radial-gradient(circle, #fff8c7, var(--gold) 56%, rgba(248, 200, 78, 0.08) 58%);
+  box-shadow: 0 0 70px rgba(248, 200, 78, 0.34);
+  animation: trophyBounce 1.8s ease-in-out infinite;
+}
+
+.landing-graphic span {
+  position: absolute;
+  right: -10px;
+  bottom: 14px;
+  width: 44px;
+  height: 44px;
+  border: 3px solid #fff;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 50% 50%, #111 0 20%, transparent 21%),
+    conic-gradient(from 18deg, #fff 0 12%, #111 12% 20%, #fff 20% 35%, #111 35% 43%, #fff 43% 58%, #111 58% 66%, #fff 66% 82%, #111 82% 90%, #fff 90%);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.32);
 }
 
 .rtl {
@@ -207,6 +263,7 @@ h2 {
   color: var(--muted);
   font-size: 18px;
   line-height: 1.45;
+  font-weight: 800;
 }
 
 .home-grid, .group-grid, .match-list {
@@ -215,13 +272,13 @@ h2 {
 }
 
 .home-card {
-  min-height: 128px;
+  min-height: 72px;
   display: grid;
   align-content: center;
-  gap: 8px;
-  padding: 18px;
+  gap: 6px;
+  padding: 16px 18px;
   border: 1px solid rgba(248, 200, 78, 0.26);
-  border-radius: 24px;
+  border-radius: 20px;
   color: var(--text);
   background:
     linear-gradient(135deg, rgba(248, 200, 78, 0.13), rgba(34, 229, 140, 0.06)),
@@ -231,7 +288,7 @@ h2 {
 }
 
 .home-card b {
-  font-size: 22px;
+  font-size: 18px;
   text-transform: uppercase;
 }
 
@@ -483,9 +540,9 @@ h2 {
 }
 
 .bracket-stage {
-  min-width: 1120px;
+  min-width: 1260px;
   display: grid;
-  grid-template-columns: 1fr 220px 1fr;
+  grid-template-columns: 1fr 210px 1fr;
   align-items: center;
   gap: 18px;
   padding: 18px;
@@ -501,8 +558,8 @@ h2 {
 .bracket-branch {
   display: grid;
   grid-template-columns: 1.35fr 1.15fr 0.95fr 0.85fr;
-  align-items: center;
-  gap: 18px;
+  align-items: stretch;
+  gap: 14px;
 }
 
 .bracket-branch.right {
@@ -513,18 +570,40 @@ h2 {
   direction: ltr;
 }
 
+.bracket-stage-column {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 10px;
+}
+
+.bracket-stage-column h3,
+.bracket-center h3 {
+  min-height: 28px;
+  margin: 0;
+  display: grid;
+  place-items: center;
+  color: var(--gold);
+  font-size: 12px;
+  font-weight: 900;
+  text-align: center;
+  text-transform: uppercase;
+}
+
 .bracket-column {
   display: grid;
-  gap: 14px;
-  align-content: center;
+  grid-template-rows: repeat(16, 42px);
+  gap: 0;
+  align-items: center;
 }
 
 .bracket-card {
   position: relative;
-  min-height: 138px;
+  min-height: 0;
+  height: 78px;
+  align-self: center;
   display: grid;
-  gap: 6px;
-  padding: 10px;
+  gap: 3px;
+  padding: 7px;
   border: 1px solid rgba(255, 255, 255, 0.52);
   border-radius: 18px;
   color: var(--text);
@@ -551,6 +630,10 @@ h2 {
   left: -18px;
 }
 
+.bracket-center .bracket-card::after {
+  display: none;
+}
+
 .bracket-card:disabled {
   cursor: not-allowed;
   opacity: 0.56;
@@ -561,13 +644,11 @@ h2 {
   box-shadow: 0 0 34px rgba(248, 200, 78, 0.14), 18px 0 0 -16px rgba(248, 200, 78, 0.86);
 }
 
-.bracket-card.compact {
-  min-height: 126px;
-}
+.bracket-card.compact { height: 78px; }
 
 .bracket-card > span {
   color: var(--gold);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 900;
 }
 
@@ -581,7 +662,7 @@ h2 {
 
 .bracket-card small {
   color: var(--gold);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 900;
   text-transform: uppercase;
 }
@@ -595,13 +676,13 @@ h2 {
 }
 
 .bracket-team .flag {
-  width: 34px;
-  height: 34px;
+  width: 28px;
+  height: 28px;
 }
 
 .bracket-team i {
-  width: 34px;
-  height: 34px;
+  width: 28px;
+  height: 28px;
   display: block;
   border: 2px solid rgba(255, 255, 255, 0.7);
   border-radius: 999px;
@@ -612,7 +693,7 @@ h2 {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 13px;
+  font-size: 11px;
 }
 
 .bracket-team.winner strong {
@@ -621,13 +702,13 @@ h2 {
 
 .bracket-center {
   display: grid;
-  gap: 18px;
+  gap: 10px;
   align-content: center;
   text-align: center;
 }
 
 .center-logo-wrap {
-  min-height: 210px;
+  min-height: 170px;
   display: grid;
   place-items: center;
   gap: 10px;
@@ -637,8 +718,8 @@ h2 {
 }
 
 .center-logo-wrap img {
-  max-width: 118px;
-  max-height: 150px;
+  max-width: 110px;
+  max-height: 130px;
   object-fit: contain;
   filter: drop-shadow(0 0 30px rgba(248, 200, 78, 0.3));
 }
@@ -937,6 +1018,11 @@ h2 {
 @keyframes flagFlash {
   from { transform: scale(1); filter: brightness(1); }
   to { transform: scale(1.08); filter: brightness(1.35); }
+}
+
+@keyframes stadiumGlow {
+  from { opacity: 0.68; transform: translateY(0) scale(1); }
+  to { opacity: 1; transform: translateY(-12px) scale(1.04); }
 }
 
 @keyframes spotlightSweep {
