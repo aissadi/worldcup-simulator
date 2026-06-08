@@ -280,10 +280,6 @@ function nextRoundSetKey(matchId: number): RoundSetKey | "" {
   return "";
 }
 
-function predictionReasonIndex(match: Match) {
-  return (match.id + match.winner.length + match.hs + match.as) % locales.en.predictionReasons.length;
-}
-
 function playTone(frequency: number, duration = 0.12, type: OscillatorType = "sine") {
   const AudioContextClass = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
   if (!AudioContextClass) return;
@@ -534,14 +530,22 @@ export default function Home() {
     share(tr(t.shareResultText, { team: champion, url }));
   }
 
-  function sharePrediction() {
+  function shareWinner() {
     const url = typeof window !== "undefined" ? window.location.href : "https://github.com/aissadi/worldcup-simulator";
-    share(tr(t.sharePredictionText, {
-      winner: currentMatch.winner,
-      loser: currentMatch.winner === currentMatch.home ? currentMatch.away : currentMatch.home,
-      score: `${currentMatch.hs}-${currentMatch.as}`,
-      url
-    }));
+    share(tr(t.shareWinnerText, { winner: currentMatch.winner, url }));
+  }
+
+  function nextAfterWinner() {
+    if (flow === "knockout") {
+      setRevealedMatchIds((previous) => new Set(previous).add(currentMatch.id));
+      setMatchRevealed(true);
+      setPredictionReady(false);
+      setPredictionLoading(false);
+      setPredictionMessage("");
+      setPhase(currentMatch.id === 104 ? "champion" : "knockout");
+      return;
+    }
+    openPredictor(Math.min(matchIndex + 1, groupPredictionMatches.length - 1), "singleMatch");
   }
 
   function goHome() {
@@ -730,17 +734,28 @@ export default function Home() {
         <section className="screen match-screen prediction-screen">
           <button className="back" onClick={() => setPhase(flow === "singleMatch" ? "matchSelect" : "knockout")}><ChevronLeft size={18} /> {flow === "knockout" ? t.backToKnockoutBracket : t.backToTournament}</button>
           <p className="step">{t.aiMatchPrediction} · {flow === "singleMatch" ? currentMatch.label : tr(t.matchNumber, { number: String(currentMatch.id) })}</p>
-          <div className={predictionLoading ? "versus-card suspense" : "versus-card"}>
-            <div className={predictionReady && currentMatch.winner === currentMatch.home ? "team-side winner" : "team-side"}>{flag(currentMatch.home, "large")}<strong>{currentMatch.home}</strong>{predictionReady && flow === "singleMatch" && <b>{currentMatch.hs}</b>}</div>
-            <span className="vs">{t.versus}</span>
-            <div className={predictionReady && currentMatch.winner === currentMatch.away ? "team-side winner" : "team-side"}>{flag(currentMatch.away, "large")}<strong>{currentMatch.away}</strong>{predictionReady && flow === "singleMatch" && <b>{currentMatch.as}</b>}</div>
-            {predictionLoading && <div className="suspense-box"><strong>{countdown}</strong><span>{predictionMessage}</span><i /></div>}
-          </div>
-          {predictionReady && <div className="prediction-result"><Trophy size={26} /><strong>{t.winner}: {flag(currentMatch.winner)} {currentMatch.winner}</strong>{flow === "singleMatch" && <em>{t.reason}: {t.predictionReasons[predictionReasonIndex(currentMatch)]}</em>}</div>}
-          {!predictionReady ? <button className="primary" disabled={predictionLoading || matchRevealed} onClick={startPrediction}>{matchRevealed ? t.winner : predictionLoading ? t.predicting : t.aiPredictWinner}</button> : <button className="primary" onClick={matchRevealed ? () => setPhase("knockout") : returnAfterPrediction}>{matchRevealed ? t.backToKnockoutBracket : t.sendWinnerToBracket}</button>}
-          {predictionReady && flow === "singleMatch" && <button className="secondary" onClick={sharePrediction}><Share2 size={18} /> {t.sharePrediction}</button>}
-          {flow === "knockout" && !matchRevealed && <button className="secondary" onClick={() => setPhase("knockout")}><ChevronLeft size={18} /> {t.backToKnockoutBracket}</button>}
-          {flow === "singleMatch" && predictionReady && <button className="secondary" onClick={() => openPredictor(Math.min(matchIndex + 1, groupPredictionMatches.length - 1), "singleMatch")}>{t.nextMatch}</button>}
+          {!predictionReady ? (
+            <>
+              <div className={predictionLoading ? "versus-card suspense" : "versus-card"}>
+                <div className="team-side">{flag(currentMatch.home, "large")}<strong>{currentMatch.home}</strong></div>
+                <span className="vs">{t.versus}</span>
+                <div className="team-side">{flag(currentMatch.away, "large")}<strong>{currentMatch.away}</strong></div>
+                {predictionLoading && <div className="suspense-box"><strong>{countdown}</strong><span>{predictionMessage}</span><i /></div>}
+              </div>
+              <button className="primary" disabled={predictionLoading || matchRevealed} onClick={startPrediction}>{matchRevealed ? t.winner : predictionLoading ? t.predicting : t.aiPredictWinner}</button>
+            </>
+          ) : (
+            <>
+              <div className="winner-only-card">
+                <Trophy size={42} />
+                <strong>{t.winner}</strong>
+                {flag(currentMatch.winner, "huge")}
+                <h2>{currentMatch.winner}</h2>
+              </div>
+              <button className="primary" onClick={nextAfterWinner}>{t.nextMatch}</button>
+              <button className="secondary" onClick={shareWinner}><Share2 size={18} /> {t.shareWinner}</button>
+            </>
+          )}
           {copied && <p className="copied">{t.copied}</p>}
         </section>
       )}

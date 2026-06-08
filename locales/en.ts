@@ -56,10 +56,8 @@ const en = {
   aiMatchPrediction: "AI Match Prediction",
   aiPredictWinner: "AI Predict Winner",
   predicting: "Predicting...",
-  predictedToWin: "predicted to win",
-  reason: "Reason",
   sendWinnerToBracket: "Send Winner To Bracket",
-  sharePrediction: "Share Prediction",
+  shareWinner: "Share Winner",
   nextMatch: "Next Match",
   revealChampion: "Reveal Champion",
   advance: "advance",
@@ -69,7 +67,7 @@ const en = {
   copied: "Copied to clipboard.",
   championLine: "{team} won my World Cup 2026 simulation 🏆",
   shareResultText: "{team} won my World Cup 2026 simulation 🏆 Try yours here: {url}",
-  sharePredictionText: "{winner} beat {loser} {score} in my World Cup 2026 prediction 🏆 Try yours here: {url}",
+  shareWinnerText: "WINNER: {winner} 🏆 Try yours here: {url}",
   roundOf32: "Round of 32",
   roundOf16: "Round of 16",
   quarterfinals: "Quarterfinals",
@@ -82,8 +80,7 @@ const en = {
   semifinalsSet: "Semifinals are set",
   finalSet: "Final is set",
   groupSuspense: ["Calculating results...", "Checking goal difference...", "Ranking teams..."],
-  predictionSuspense: ["Analyzing team form...", "Checking ratings...", "Running simulation..."],
-  predictionReasons: ["higher attack rating", "better tournament form", "stronger knockout momentum", "more clinical finishing", "better defensive balance", "big-game experience"]
+  predictionSuspense: ["Analyzing team form...", "Checking ratings...", "Running simulation..."]
 } as const;
 
 export default en;

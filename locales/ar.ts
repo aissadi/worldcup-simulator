@@ -56,10 +56,8 @@ const ar = {
   aiMatchPrediction: "توقع المباراة بالذكاء الاصطناعي",
   aiPredictWinner: "توقع الفائز بالذكاء الاصطناعي",
   predicting: "جارٍ التوقع...",
-  predictedToWin: "متوقع للفوز",
-  reason: "السبب",
   sendWinnerToBracket: "إرسال الفائز إلى المسار",
-  sharePrediction: "مشاركة التوقع",
+  shareWinner: "مشاركة الفائز",
   nextMatch: "المباراة التالية",
   revealChampion: "كشف البطل",
   advance: "تأهل",
@@ -69,7 +67,7 @@ const ar = {
   copied: "تم النسخ إلى الحافظة.",
   championLine: "{team} فازت بمحاكاة كأس العالم 2026 الخاصة بي 🏆",
   shareResultText: "{team} فازت بمحاكاة كأس العالم 2026 الخاصة بي 🏆 جرّبها هنا: {url}",
-  sharePredictionText: "{winner} فاز على {loser} بنتيجة {score} في توقعي لكأس العالم 2026 🏆 جرّبها هنا: {url}",
+  shareWinnerText: "الفائز: {winner} 🏆 جرّبها هنا: {url}",
   roundOf32: "دور الـ32",
   roundOf16: "دور الـ16",
   quarterfinals: "ربع النهائي",
@@ -82,8 +80,7 @@ const ar = {
   semifinalsSet: "اكتمل نصف النهائي",
   finalSet: "اكتمل النهائي",
   groupSuspense: ["جارٍ حساب النتائج...", "جارٍ فحص فارق الأهداف...", "جارٍ ترتيب الفرق..."],
-  predictionSuspense: ["جارٍ تحليل مستوى الفريق...", "جارٍ فحص التقييمات...", "جارٍ تشغيل المحاكاة..."],
-  predictionReasons: ["قوة هجومية أعلى", "مستوى أفضل في البطولة", "زخم أقوى في الأدوار الإقصائية", "حسم أفضل أمام المرمى", "توازن دفاعي أفضل", "خبرة في المباريات الكبيرة"]
+  predictionSuspense: ["جارٍ تحليل مستوى الفريق...", "جارٍ فحص التقييمات...", "جارٍ تشغيل المحاكاة..."]
 } as const;
 
 export default ar;

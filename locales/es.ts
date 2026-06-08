@@ -56,10 +56,8 @@ const es = {
   aiMatchPrediction: "Predicción IA del Partido",
   aiPredictWinner: "IA Predice Ganador",
   predicting: "Prediciendo...",
-  predictedToWin: "predicho como ganador",
-  reason: "Razón",
   sendWinnerToBracket: "Enviar Ganador al Cuadro",
-  sharePrediction: "Compartir Predicción",
+  shareWinner: "Compartir Ganador",
   nextMatch: "Siguiente Partido",
   revealChampion: "Revelar Campeón",
   advance: "avanza",
@@ -69,7 +67,7 @@ const es = {
   copied: "Copiado al portapapeles.",
   championLine: "{team} ganó mi simulación del Mundial 2026 🏆",
   shareResultText: "{team} ganó mi simulación del Mundial 2026 🏆 Pruébalo aquí: {url}",
-  sharePredictionText: "{winner} venció a {loser} {score} en mi predicción del Mundial 2026 🏆 Pruébalo aquí: {url}",
+  shareWinnerText: "GANADOR: {winner} 🏆 Pruébalo aquí: {url}",
   roundOf32: "Ronda de 32",
   roundOf16: "Octavos de Final",
   quarterfinals: "Cuartos de Final",
@@ -82,8 +80,7 @@ const es = {
   semifinalsSet: "Las semifinales están listas",
   finalSet: "La final está lista",
   groupSuspense: ["Calculando resultados...", "Revisando diferencia de goles...", "Ordenando equipos..."],
-  predictionSuspense: ["Analizando forma del equipo...", "Revisando ratings...", "Ejecutando simulación..."],
-  predictionReasons: ["mejor ataque", "mejor forma en el torneo", "más impulso en eliminatorias", "definición más precisa", "mejor equilibrio defensivo", "experiencia en grandes partidos"]
+  predictionSuspense: ["Analizando forma del equipo...", "Revisando ratings...", "Ejecutando simulación..."]
 } as const;
 
 export default es;
