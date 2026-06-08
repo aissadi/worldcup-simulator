@@ -436,6 +436,7 @@ export default function Home() {
   const [builderPicks, setBuilderPicks] = useState<Record<string, BuilderPick>>({});
   const [builderThirdGroups, setBuilderThirdGroups] = useState<string[]>([]);
   const [manualWinners, setManualWinners] = useState<Record<number, string>>({});
+  const [builderWarning, setBuilderWarning] = useState("");
 
   const result = useMemo(() => simulate(seed), [seed]);
   const groupPredictionMatches = useMemo(() => buildGroupPredictionMatches(seed), [seed]);
@@ -489,6 +490,7 @@ export default function Home() {
     setBuilderPicks({});
     setBuilderThirdGroups([]);
     setManualWinners({});
+    setBuilderWarning("");
   }
 
   function openHomeCard(nextFlow: Flow) {
@@ -508,6 +510,7 @@ export default function Home() {
       setBuilderPicks({});
       setBuilderThirdGroups([]);
       setManualWinners({});
+      setBuilderWarning("");
       setPhase("builderGroup");
     }
   }
@@ -674,8 +677,12 @@ export default function Home() {
   function setBuilderPick(groupId: string, place: keyof BuilderPick, name: string) {
     setBuilderPicks((previous) => {
       const nextGroup = { ...(previous[groupId] || {}) };
-      const entries = Object.entries(nextGroup).filter(([key, value]) => key !== place && value === name);
-      entries.forEach(([key]) => delete nextGroup[key as keyof BuilderPick]);
+      const duplicate = Object.entries(nextGroup).some(([key, value]) => key !== place && value === name);
+      if (duplicate) {
+        setBuilderWarning(t.duplicatePickWarning);
+        return previous;
+      }
+      setBuilderWarning("");
       nextGroup[place] = nextGroup[place] === name ? undefined : name;
       return { ...previous, [groupId]: nextGroup };
     });
@@ -689,8 +696,10 @@ export default function Home() {
   function continueBuilderGroup() {
     if (builderGroupIndex < groups.length - 1) {
       setBuilderGroupIndex(builderGroupIndex + 1);
+      setBuilderWarning("");
       return;
     }
+    setBuilderWarning("");
     setPhase("builderThirds");
   }
 
@@ -875,14 +884,15 @@ export default function Home() {
                 <article className="builder-team" key={item.name}>
                   <div>{flag(item.name)}<strong>{item.name}</strong></div>
                   <div className="builder-pick-row">
-                    <button type="button" className={pick.first === item.name ? "active" : ""} onClick={() => setBuilderPick(groups[builderGroupIndex].id, "first", item.name)}>{t.firstPlace}</button>
-                    <button type="button" className={pick.second === item.name ? "active" : ""} onClick={() => setBuilderPick(groups[builderGroupIndex].id, "second", item.name)}>{t.secondPlace}</button>
-                    <button type="button" className={pick.third === item.name ? "active" : ""} onClick={() => setBuilderPick(groups[builderGroupIndex].id, "third", item.name)}>{t.thirdCandidate}</button>
+                    <button type="button" className={pick.first === item.name ? "pick-button first active" : "pick-button first"} onClick={() => setBuilderPick(groups[builderGroupIndex].id, "first", item.name)}>{t.firstPlace}</button>
+                    <button type="button" className={pick.second === item.name ? "pick-button second active" : "pick-button second"} onClick={() => setBuilderPick(groups[builderGroupIndex].id, "second", item.name)}>{t.secondPlace}</button>
+                    <button type="button" className={pick.third === item.name ? "pick-button third active" : "pick-button third"} onClick={() => setBuilderPick(groups[builderGroupIndex].id, "third", item.name)}>{t.thirdCandidate}</button>
                   </div>
                 </article>
               );
             })}
           </div>
+          {builderWarning && <p className="builder-warning">{builderWarning}</p>}
           <button className="primary" disabled={!builderGroupComplete(groups[builderGroupIndex].id)} onClick={continueBuilderGroup}>{builderGroupIndex === groups.length - 1 ? t.chooseBestThirds : t.nextGroup}</button>
         </section>
       )}

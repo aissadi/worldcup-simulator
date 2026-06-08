@@ -17,6 +17,7 @@ const ar = {
   aiMode: "وضع الذكاء الاصطناعي",
   manualBuilderMode: "وضع البناء اليدوي",
   selectGroupFinishers: "اختر المركز الأول والثاني ومرشحًا اختياريًا للمركز الثالث.",
+  duplicatePickWarning: "لا يمكن اختيار الفريق أكثر من مرة في هذه المجموعة.",
   firstPlace: "الأول",
   secondPlace: "الثاني",
   thirdCandidate: "الثالث",

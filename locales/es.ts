@@ -17,6 +17,7 @@ const es = {
   aiMode: "Modo IA",
   manualBuilderMode: "Modo Constructor Manual",
   selectGroupFinishers: "Selecciona 1.º, 2.º y un candidato opcional al 3.º lugar.",
+  duplicatePickWarning: "Un equipo solo puede seleccionarse una vez en este grupo.",
   firstPlace: "1.º",
   secondPlace: "2.º",
   thirdCandidate: "3.º",

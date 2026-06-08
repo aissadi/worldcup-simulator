@@ -17,6 +17,7 @@ const en = {
   aiMode: "AI Mode",
   manualBuilderMode: "Manual Builder Mode",
   selectGroupFinishers: "Select 1st, 2nd, and an optional 3rd-place candidate.",
+  duplicatePickWarning: "A team can only be selected once in this group.",
   firstPlace: "1st",
   secondPlace: "2nd",
   thirdCandidate: "3rd",

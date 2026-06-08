@@ -199,6 +199,7 @@ button { font: inherit; }
 .rtl .landing,
 .rtl .home-card,
 .rtl .mini-match,
+.rtl .third-select,
 .rtl .match-open-card div,
 .rtl .bracket-card {
   text-align: right;
@@ -309,6 +310,125 @@ h2 {
   background: var(--panel);
   font-size: 18px;
   font-weight: 900;
+}
+
+.builder-board {
+  display: grid;
+  gap: 14px;
+}
+
+.builder-team {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 20px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03)),
+    rgba(0, 0, 0, 0.22);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.22);
+}
+
+.builder-team > div:first-child {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+
+.builder-team strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 18px;
+}
+
+.builder-pick-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.pick-button {
+  min-height: 48px;
+  position: relative;
+  z-index: 2;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 14px;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 14px;
+  font-weight: 1000;
+  text-transform: uppercase;
+  touch-action: manipulation;
+  cursor: pointer;
+}
+
+.pick-button.active {
+  color: #061009;
+  transform: translateY(-1px);
+}
+
+.pick-button.first.active {
+  border-color: rgba(248, 200, 78, 0.9);
+  background: linear-gradient(135deg, #fff5b2, var(--gold));
+  box-shadow: 0 0 26px rgba(248, 200, 78, 0.28);
+}
+
+.pick-button.second.active {
+  border-color: rgba(230, 237, 244, 0.9);
+  background: linear-gradient(135deg, #f8fbff, #aeb8c4);
+  box-shadow: 0 0 24px rgba(230, 237, 244, 0.22);
+}
+
+.pick-button.third.active {
+  border-color: rgba(224, 154, 63, 0.95);
+  background: linear-gradient(135deg, #ffd98a, #c9832f);
+  box-shadow: 0 0 24px rgba(224, 154, 63, 0.24);
+}
+
+.builder-warning {
+  margin: -4px 0 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(248, 200, 78, 0.38);
+  border-radius: 14px;
+  color: var(--gold);
+  background: rgba(248, 200, 78, 0.1);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.third-select {
+  min-height: 76px;
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 18px;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.075);
+  text-align: left;
+  font-weight: 900;
+}
+
+.third-select.active {
+  border-color: var(--gold);
+  background: rgba(248, 200, 78, 0.14);
+}
+
+.third-select:disabled {
+  opacity: 0.45;
+}
+
+.third-select strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .back {
@@ -1177,6 +1297,20 @@ h2 {
   .wc-logo {
     height: 50px;
     max-width: 90px;
+  }
+
+  .builder-team {
+    padding: 12px;
+  }
+
+  .builder-pick-row {
+    gap: 7px;
+  }
+
+  .pick-button {
+    min-height: 50px;
+    font-size: 13px;
+    padding: 0 6px;
   }
 }
 
