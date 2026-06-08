@@ -440,6 +440,7 @@ export default function Home() {
   const [bracketZoom, setBracketZoom] = useState(1);
   const pinchDistanceRef = useRef<number | null>(null);
   const pinchZoomRef = useRef(1);
+  const bracketScrollRef = useRef<HTMLDivElement | null>(null);
 
   const result = useMemo(() => simulate(seed), [seed]);
   const groupPredictionMatches = useMemo(() => buildGroupPredictionMatches(seed), [seed]);
@@ -471,6 +472,14 @@ export default function Home() {
     pinchZoomRef.current = bracketZoom;
   }, [bracketZoom]);
 
+  useEffect(() => {
+    if (phase !== "knockout" && phase !== "builderBracket") return;
+    setBracketZoom(1);
+    window.requestAnimationFrame(() => {
+      bracketScrollRef.current?.scrollTo({ left: 0, top: 0 });
+    });
+  }, [phase]);
+
   function tr(template: string, values: Record<string, string>) {
     return Object.entries(values).reduce((text, [key, value]) => text.replaceAll(`{${key}}`, value), template);
   }
@@ -485,6 +494,9 @@ export default function Home() {
 
   function resetBracketView() {
     setBracketZoom(1);
+    window.requestAnimationFrame(() => {
+      bracketScrollRef.current?.scrollTo({ left: 0, top: 0, behavior: "smooth" });
+    });
   }
 
   function touchDistance(touches: React.TouchList) {
@@ -972,8 +984,8 @@ export default function Home() {
             <button type="button" onClick={() => zoomBracket(-0.15)}>{t.zoomOut}</button>
             <button type="button" onClick={resetBracketView}>{t.resetView}</button>
           </div>
-          <div className="bracket-scroll" onTouchStart={startBracketTouch} onTouchMove={moveBracketTouch} onTouchEnd={endBracketTouch}>
-            <div className="bracket-canvas" style={{ width: `${1600 * bracketZoom}px`, height: `${2200 * bracketZoom}px` }}>
+          <div className="bracket-scroll" ref={bracketScrollRef} onTouchStart={startBracketTouch} onTouchMove={moveBracketTouch} onTouchEnd={endBracketTouch}>
+            <div className="bracket-canvas" style={{ width: `${1800 * bracketZoom}px`, height: `${2200 * bracketZoom}px` }}>
               <div className="bracket-stage" style={{ transform: `scale(${bracketZoom})` }}>
                 <ManualBranch side="left" />
                 <div className="bracket-center">
@@ -1037,8 +1049,8 @@ export default function Home() {
             <button type="button" onClick={() => zoomBracket(-0.15)}>{t.zoomOut}</button>
             <button type="button" onClick={resetBracketView}>{t.resetView}</button>
           </div>
-          <div className="bracket-scroll" onTouchStart={startBracketTouch} onTouchMove={moveBracketTouch} onTouchEnd={endBracketTouch}>
-            <div className="bracket-canvas" style={{ width: `${1600 * bracketZoom}px`, height: `${2200 * bracketZoom}px` }}>
+          <div className="bracket-scroll" ref={bracketScrollRef} onTouchStart={startBracketTouch} onTouchMove={moveBracketTouch} onTouchEnd={endBracketTouch}>
+            <div className="bracket-canvas" style={{ width: `${1800 * bracketZoom}px`, height: `${2200 * bracketZoom}px` }}>
               <div className="bracket-stage" style={{ transform: `scale(${bracketZoom})` }}>
                 <BracketBranch side="left" />
                 <div className="bracket-center">

@@ -9,6 +9,7 @@
   --gold: #f8c84e;
   --green: #22e58c;
   --danger: #ff5b5b;
+  --header-height: 74px;
 }
 
 * { box-sizing: border-box; }
@@ -24,10 +25,10 @@ button { font: inherit; }
 .app {
   position: relative;
   overflow: visible;
-  min-height: 100vh;
+  min-height: 100dvh;
   display: grid;
   place-items: stretch;
-  padding: 92px 12px 18px;
+  padding: var(--header-height) 12px 18px;
   background:
     radial-gradient(circle at 50% -10%, rgba(248, 200, 78, 0.26), transparent 34%),
     radial-gradient(circle at 86% 8%, rgba(34, 229, 140, 0.15), transparent 26%),
@@ -56,7 +57,7 @@ button { font: inherit; }
   left: 0;
   right: 0;
   z-index: 40;
-  min-height: 74px;
+  min-height: var(--header-height);
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
@@ -660,8 +661,8 @@ h2 {
 
 .bracket-screen {
   max-width: 100%;
-  min-height: calc(100vh - 92px);
-  height: calc(100vh - 92px);
+  min-height: calc(100dvh - var(--header-height));
+  height: calc(100dvh - var(--header-height));
   justify-content: flex-start;
   overflow: visible;
 }
@@ -670,8 +671,9 @@ h2 {
   width: 100%;
   flex: 1 1 auto;
   min-height: 0;
-  height: calc(100vh - 252px);
-  overflow: auto;
+  height: 100%;
+  overflow-x: auto;
+  overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
   touch-action: pan-x pan-y pinch-zoom;
@@ -681,13 +683,13 @@ h2 {
 
 .bracket-canvas {
   position: relative;
-  min-width: 1600px;
+  min-width: 1800px;
   min-height: 2200px;
 }
 
 .bracket-stage {
-  width: 1600px;
-  min-width: 1600px;
+  width: 1800px;
+  min-width: 1800px;
   min-height: 2200px;
   display: flex;
   align-items: flex-start;
@@ -1361,7 +1363,7 @@ h2 {
 @media (max-width: 719px) {
   .bracket-scroll {
     margin: 0 -12px;
-    height: calc(100vh - 276px);
+    height: 100%;
     padding: 8px 12px 18px;
   }
 
@@ -1394,7 +1396,7 @@ h2 {
 
 @media (min-width: 720px) {
   .app {
-    padding: 96px 28px 28px;
+    padding: var(--header-height) 28px 28px;
   }
 
   .screen {
