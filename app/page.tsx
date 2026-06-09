@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronLeft, House, Share2, Sparkles, Trophy, Volume2, Zap } from "lucide-react";
-import { type ReactNode, type TouchEvent, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, type ReactNode, type TouchEvent, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { languageOptions, locales, type LocaleCode } from "../locales";
 
 type Phase = "home" | "fullIntro" | "tournamentGroup" | "groupSelect" | "groupReveal" | "bestThirds" | "matchSelect" | "predictor" | "knockout" | "roundSet" | "champion" | "builderGroup" | "builderThirds" | "builderBracket";
@@ -90,6 +90,13 @@ const bracketLayout = {
   left: [[73, 75, 74, 77, 83, 84, 81, 82], [89, 90, 93, 94], [97, 98], [101]],
   right: [[76, 78, 79, 80, 86, 88, 85, 87], [91, 92, 95, 96], [99, 100], [102]]
 } as const;
+const mobileBracketStages = [
+  { key: "roundOf32", ids: [73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88] },
+  { key: "roundOf16", ids: [89, 90, 91, 92, 93, 94, 95, 96] },
+  { key: "quarterfinals", ids: [97, 98, 99, 100] },
+  { key: "semifinals", ids: [101, 102] },
+  { key: "final", ids: [104] }
+] as const;
 const bracketRows = new Map<number, { row: number; span: number }>([
   [73, { row: 1, span: 2 }], [75, { row: 3, span: 2 }], [74, { row: 5, span: 2 }], [77, { row: 7, span: 2 }],
   [83, { row: 9, span: 2 }], [84, { row: 11, span: 2 }], [81, { row: 13, span: 2 }], [82, { row: 15, span: 2 }],
@@ -1158,10 +1165,86 @@ export default function Home() {
     );
   }
 
-  function BracketViewport({ children }: { children: ReactNode }) {
+  function MobileKnockoutCard({ matchId }: { matchId: number }) {
+    const match = matchById.get(matchId)?.match;
+    const available = isKnockoutMatchAvailable(matchId);
+    const revealed = revealedMatchIds.has(matchId);
+    const homeName = available && match ? match.home : "";
+    const awayName = available && match ? match.away : "";
+
+    return (
+      <button
+        type="button"
+        className={`mobile-match-card ${revealed ? "revealed" : ""}`}
+        onClick={() => openKnockoutMatch(matchId)}
+        disabled={!available}
+        aria-label={available ? `${tr(t.matchNumber, { number: String(matchId) })}: ${homeName} ${t.versus} ${awayName}` : `${tr(t.matchNumber, { number: String(matchId) })} ${t.locked}`}
+      >
+        <span>{`M${matchId}`}</span>
+        <div className={`mobile-flag-row ${revealed && match?.winner === homeName ? "winner" : revealed ? "loser" : ""}`}>
+          {homeName ? flag(homeName) : <i />}
+        </div>
+        <div className={`mobile-flag-row ${revealed && match?.winner === awayName ? "winner" : revealed ? "loser" : ""}`}>
+          {awayName ? flag(awayName) : <i />}
+        </div>
+      </button>
+    );
+  }
+
+  function MobileManualKnockoutCard({ matchId }: { matchId: number }) {
+    const match = manualMatches.get(matchId);
+    if (!match) return null;
+
+    return (
+      <div
+        className={`mobile-match-card manual ${match.winner ? "revealed" : ""}`}
+        aria-label={`${tr(t.matchNumber, { number: String(matchId) })}: ${match.home || match.homeSource} ${t.versus} ${match.away || match.awaySource}`}
+      >
+        <span>{`M${matchId}`}</span>
+        {(["home", "away"] as const).map((side) => {
+          const name = match[side];
+          const state = match.winner === name ? "winner" : match.winner ? "loser" : "";
+          return (
+            <button
+              type="button"
+              className={`mobile-flag-row ${state}`}
+              key={side}
+              onClick={() => name && match.ready && chooseManualWinner(matchId, name)}
+              disabled={!name || !match.ready}
+              aria-label={name ? `${t.winner}: ${name}` : t.locked}
+            >
+              {name ? flag(name) : <i />}
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
+
+  function MobileKnockoutTree({ manual = false }: { manual?: boolean }) {
+    return (
+      <div className="mobile-bracket-tree">
+        {mobileBracketStages.map((stage) => (
+          <section className="mobile-bracket-stage" key={stage.key}>
+            <h3>{t[stage.key]}</h3>
+            <div className="mobile-stage-grid" style={{ "--match-count": stage.ids.length } as CSSProperties}>
+              {stage.ids.map((matchId) => manual ? (
+                <MobileManualKnockoutCard key={matchId} matchId={matchId} />
+              ) : (
+                <MobileKnockoutCard key={matchId} matchId={matchId} />
+              ))}
+            </div>
+          </section>
+        ))}
+      </div>
+    );
+  }
+
+  function BracketViewport({ children, mobile }: { children: ReactNode; mobile: ReactNode }) {
     const scale = bracketFitScale * bracketZoom;
     return (
       <div className="bracket-viewport" ref={(node) => { bracketScrollRef.current = node; bracketViewportRef.current = node; }}>
+        {mobile}
         <div className="bracket-canvas" style={{ width: `${BRACKET_CANVAS_WIDTH * scale}px`, height: `${BRACKET_CANVAS_HEIGHT * scale}px` }}>
           <div className="bracket-stage" style={{ transform: `scale(${scale})` }}>
             {children}
@@ -1317,7 +1400,7 @@ export default function Home() {
             <p className="step">{t.tapWinner}</p>
             <p className="bracket-help">{t.swipeToExplore}</p>
           </div>
-          <BracketViewport>
+          <BracketViewport mobile={<MobileKnockoutTree manual />}>
             <ManualBranch side="left" />
             <div className="bracket-center">
               <h3>{t.final}</h3>
@@ -1380,7 +1463,7 @@ export default function Home() {
               </button>
             )}
           </div>
-          <BracketViewport>
+          <BracketViewport mobile={<MobileKnockoutTree />}>
             <BracketBranch side="left" />
             <div className="bracket-center">
               <h3>{t.final}</h3>
