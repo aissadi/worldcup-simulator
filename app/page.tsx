@@ -457,7 +457,7 @@ export default function Home() {
   const [autoRunning, setAutoRunning] = useState(false);
   const [autoPaused, setAutoPaused] = useState(false);
   const [autoThirdRevealCount, setAutoThirdRevealCount] = useState(0);
-  const [autoKnockoutStatus, setAutoKnockoutStatus] = useState<"idle" | "loading" | "winner">("idle");
+  const [autoKnockoutStatus, setAutoKnockoutStatus] = useState<"overview" | "idle" | "loading" | "winner">("idle");
   const pinchDistanceRef = useRef<number | null>(null);
   const pinchZoomRef = useRef(1);
   const bracketScrollRef = useRef<HTMLDivElement | null>(null);
@@ -496,7 +496,7 @@ export default function Home() {
 
   useLayoutEffect(() => {
     if (phase !== "knockout" && phase !== "builderBracket") return;
-    setBracketZoom(1);
+    setBracketZoom(phase === "knockout" && flow === "full" ? 0.42 : 1);
     window.requestAnimationFrame(() => {
       const viewport = bracketScrollRef.current;
       if (!viewport) return;
@@ -541,7 +541,7 @@ export default function Home() {
         scheduleAutoTimer(() => {
           setMatchIndex(0);
           setRevealedMatchIds(new Set());
-          setAutoKnockoutStatus("idle");
+          setAutoKnockoutStatus("overview");
           setPhase("knockout");
         }, 1200);
       }
@@ -550,9 +550,13 @@ export default function Home() {
     if (phase === "knockout") {
       const match = knockoutMatches[matchIndex];
       if (!match) return;
+      if (autoKnockoutStatus === "overview") {
+        scheduleAutoTimer(() => showBracketOverview(), 150);
+        scheduleAutoTimer(() => setAutoKnockoutStatus("idle"), 2600);
+      }
       if (autoKnockoutStatus === "idle" && isKnockoutMatchAvailable(match.id)) {
         scheduleAutoTimer(() => {
-          panBracketToRound(roundKey(match.id));
+          focusBracketRound(roundKey(match.id));
           setAutoKnockoutStatus("loading");
           playDrumRoll();
         }, 700);
@@ -574,8 +578,7 @@ export default function Home() {
           const nextIndex = matchIndex + 1;
           const nextMatch = knockoutMatches[nextIndex];
           setMatchIndex(nextIndex);
-          setAutoKnockoutStatus("idle");
-          if (nextMatch) panBracketToRound(roundKey(nextMatch.id));
+          setAutoKnockoutStatus(nextMatch && roundKey(nextMatch.id) !== roundKey(match.id) ? "overview" : "idle");
         }, 1500);
       }
     }
@@ -625,20 +628,29 @@ export default function Home() {
     });
   }
 
-  function panBracketToRound(key: RoundKey) {
-    const positions: Record<RoundKey, number> = {
-      roundOf32: 0,
-      roundOf16: 320,
-      quarterfinals: 630,
-      semifinals: 920,
-      final: 1180,
-      thirdPlaceMatch: 1180
-    };
+  function showBracketOverview() {
+    setBracketZoom(0.42);
     window.requestAnimationFrame(() => {
       const viewport = bracketScrollRef.current;
       if (!viewport) return;
-      viewport.scrollLeft = positions[key];
-      viewport.scrollTop = 0;
+      viewport.scrollTo({ left: 0, top: 0, behavior: "smooth" });
+    });
+  }
+
+  function focusBracketRound(key: RoundKey) {
+    const positions: Record<RoundKey, number> = {
+      roundOf32: 0,
+      roundOf16: 210,
+      quarterfinals: 410,
+      semifinals: 600,
+      final: 760,
+      thirdPlaceMatch: 760
+    };
+    setBracketZoom(0.72);
+    window.requestAnimationFrame(() => {
+      const viewport = bracketScrollRef.current;
+      if (!viewport) return;
+      viewport.scrollTo({ left: positions[key], top: 0, behavior: "smooth" });
     });
   }
 
@@ -1300,11 +1312,6 @@ export default function Home() {
             <h2>{t.buildYourPredictions}</h2>
             <p className="step">{t.tapWinner}</p>
             <p className="bracket-help">{t.swipeToExplore}</p>
-            <div className="zoom-controls" aria-label={t.zoomControls}>
-              <button type="button" onClick={() => zoomBracket(0.15)}>{t.zoomIn}</button>
-              <button type="button" onClick={() => zoomBracket(-0.15)}>{t.zoomOut}</button>
-              <button type="button" onClick={resetBracketView}>{t.resetView}</button>
-            </div>
           </div>
           <BracketViewport>
             <ManualBranch side="left" />
@@ -1363,11 +1370,6 @@ export default function Home() {
             <h2>{t.knockoutBracket}</h2>
             <p className="step">{t.tapAnyLiveMatch}</p>
             <p className="bracket-help">{t.swipeToExplore}</p>
-            <div className="zoom-controls" aria-label={t.zoomControls}>
-              <button type="button" onClick={() => zoomBracket(0.15)}>{t.zoomIn}</button>
-              <button type="button" onClick={() => zoomBracket(-0.15)}>{t.zoomOut}</button>
-              <button type="button" onClick={resetBracketView}>{t.resetView}</button>
-            </div>
             {flow === "full" && autoRunning && (
               <button className="secondary compact-action" onClick={() => setAutoPaused((current) => !current)}>
                 {autoPaused ? t.resumePrediction : t.pausePrediction}

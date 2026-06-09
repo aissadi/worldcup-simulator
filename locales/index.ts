@@ -9,5 +9,5 @@ export type Locale = typeof en;
 export const languageOptions: Array<{ code: LocaleCode; label: string; flag: string }> = [
   { code: "en", label: "English", flag: "🇺🇸" },
   { code: "es", label: "Español", flag: "🇪🇸" },
-  { code: "ar", label: "العربية", flag: "🇲🇦" }
+  { code: "ar", label: "العربية", flag: "🇸🇦" }
 ];
