@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronLeft, House, Share2, Sparkles, Trophy, Volume2, Zap } from "lucide-react";
-import { type TouchEvent, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, type TouchEvent, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { languageOptions, locales, type LocaleCode } from "../locales";
 
 type Phase = "home" | "tournamentGroup" | "groupSelect" | "groupReveal" | "matchSelect" | "predictor" | "knockout" | "roundSet" | "champion" | "builderGroup" | "builderThirds" | "builderBracket";
@@ -476,7 +476,10 @@ export default function Home() {
     if (phase !== "knockout" && phase !== "builderBracket") return;
     setBracketZoom(1);
     window.requestAnimationFrame(() => {
-      bracketScrollRef.current?.scrollTo({ left: 0, top: 0 });
+      const viewport = bracketScrollRef.current;
+      if (!viewport) return;
+      viewport.scrollLeft = 0;
+      viewport.scrollTop = 0;
     });
   }, [phase]);
 
@@ -495,7 +498,10 @@ export default function Home() {
   function resetBracketView() {
     setBracketZoom(1);
     window.requestAnimationFrame(() => {
-      bracketScrollRef.current?.scrollTo({ left: 0, top: 0, behavior: "smooth" });
+      const viewport = bracketScrollRef.current;
+      if (!viewport) return;
+      viewport.scrollLeft = 0;
+      viewport.scrollTop = 0;
     });
   }
 
@@ -875,6 +881,18 @@ export default function Home() {
     );
   }
 
+  function BracketViewport({ children }: { children: ReactNode }) {
+    return (
+      <div className="bracket-viewport" ref={bracketScrollRef} onTouchStart={startBracketTouch} onTouchMove={moveBracketTouch} onTouchEnd={endBracketTouch}>
+        <div className="bracket-canvas" style={{ width: `${1800 * bracketZoom}px`, minHeight: `${2400 * bracketZoom}px` }}>
+          <div className="bracket-stage" style={{ transform: `scale(${bracketZoom})` }}>
+            {children}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const groupScreen = (
     <section className="screen">
       <button className="back" onClick={() => setPhase(flow === "group" ? "groupSelect" : "home")}><ChevronLeft size={18} /> {t.back}</button>
@@ -974,35 +992,33 @@ export default function Home() {
       )}
 
       {phase === "builderBracket" && (
-        <section className="screen bracket-screen">
-          <p className="kicker">{t.manualBuilderMode}</p>
-          <h2>{t.buildYourPredictions}</h2>
-          <p className="step">{t.tapWinner}</p>
-          <p className="bracket-help">{t.swipeToExplore}</p>
-          <div className="zoom-controls" aria-label={t.zoomControls}>
-            <button type="button" onClick={() => zoomBracket(0.15)}>{t.zoomIn}</button>
-            <button type="button" onClick={() => zoomBracket(-0.15)}>{t.zoomOut}</button>
-            <button type="button" onClick={resetBracketView}>{t.resetView}</button>
-          </div>
-          <div className="bracket-scroll" ref={bracketScrollRef} onTouchStart={startBracketTouch} onTouchMove={moveBracketTouch} onTouchEnd={endBracketTouch}>
-            <div className="bracket-canvas" style={{ width: `${1800 * bracketZoom}px`, height: `${2200 * bracketZoom}px` }}>
-              <div className="bracket-stage" style={{ transform: `scale(${bracketZoom})` }}>
-                <ManualBranch side="left" />
-                <div className="bracket-center">
-                  <h3>{t.final}</h3>
-                  <div className="center-logo-wrap">
-                    <img src="/worldcup-2026-logo.png" alt={t.logoAlt} />
-                    <span>{t.trophyPath}</span>
-                  </div>
-                  <ManualBracketCard matchId={104} compact />
-                  <h3>{t.thirdPlaceShort}</h3>
-                  <ManualBracketCard matchId={103} compact />
-                </div>
-                <ManualBranch side="right" />
-              </div>
+        <section className="bracket-page">
+          <div className="bracket-toolbar">
+            <p className="kicker">{t.manualBuilderMode}</p>
+            <h2>{t.buildYourPredictions}</h2>
+            <p className="step">{t.tapWinner}</p>
+            <p className="bracket-help">{t.swipeToExplore}</p>
+            <div className="zoom-controls" aria-label={t.zoomControls}>
+              <button type="button" onClick={() => zoomBracket(0.15)}>{t.zoomIn}</button>
+              <button type="button" onClick={() => zoomBracket(-0.15)}>{t.zoomOut}</button>
+              <button type="button" onClick={resetBracketView}>{t.resetView}</button>
             </div>
           </div>
-          {manualChampion && <button className="primary" onClick={() => setPhase("champion")}>{t.revealChampion}</button>}
+          <BracketViewport>
+            <ManualBranch side="left" />
+            <div className="bracket-center">
+              <h3>{t.final}</h3>
+              <div className="center-logo-wrap">
+                <img src="/worldcup-2026-logo.png" alt={t.logoAlt} />
+                <span>{t.trophyPath}</span>
+              </div>
+              <ManualBracketCard matchId={104} compact />
+              <h3>{t.thirdPlaceShort}</h3>
+              <ManualBracketCard matchId={103} compact />
+            </div>
+            <ManualBranch side="right" />
+          </BracketViewport>
+          {manualChampion && <button className="primary bracket-complete-action" onClick={() => setPhase("champion")}>{t.revealChampion}</button>}
         </section>
       )}
 
@@ -1039,34 +1055,32 @@ export default function Home() {
       )}
 
       {phase === "knockout" && (
-        <section className="screen bracket-screen">
-          <p className="kicker">{t.aiMode}</p>
-          <h2>{t.knockoutBracket}</h2>
-          <p className="step">{t.tapAnyLiveMatch}</p>
-          <p className="bracket-help">{t.swipeToExplore}</p>
-          <div className="zoom-controls" aria-label={t.zoomControls}>
-            <button type="button" onClick={() => zoomBracket(0.15)}>{t.zoomIn}</button>
-            <button type="button" onClick={() => zoomBracket(-0.15)}>{t.zoomOut}</button>
-            <button type="button" onClick={resetBracketView}>{t.resetView}</button>
-          </div>
-          <div className="bracket-scroll" ref={bracketScrollRef} onTouchStart={startBracketTouch} onTouchMove={moveBracketTouch} onTouchEnd={endBracketTouch}>
-            <div className="bracket-canvas" style={{ width: `${1800 * bracketZoom}px`, height: `${2200 * bracketZoom}px` }}>
-              <div className="bracket-stage" style={{ transform: `scale(${bracketZoom})` }}>
-                <BracketBranch side="left" />
-                <div className="bracket-center">
-                  <h3>{t.final}</h3>
-                  <div className="center-logo-wrap">
-                    <img src="/worldcup-2026-logo.png" alt={t.logoAlt} />
-                    <span>{t.trophyPath}</span>
-                  </div>
-                  <BracketCard matchId={104} compact />
-                  <h3>{t.thirdPlaceShort}</h3>
-                  <BracketCard matchId={103} compact />
-                </div>
-                <BracketBranch side="right" />
-              </div>
+        <section className="bracket-page">
+          <div className="bracket-toolbar">
+            <p className="kicker">{t.aiMode}</p>
+            <h2>{t.knockoutBracket}</h2>
+            <p className="step">{t.tapAnyLiveMatch}</p>
+            <p className="bracket-help">{t.swipeToExplore}</p>
+            <div className="zoom-controls" aria-label={t.zoomControls}>
+              <button type="button" onClick={() => zoomBracket(0.15)}>{t.zoomIn}</button>
+              <button type="button" onClick={() => zoomBracket(-0.15)}>{t.zoomOut}</button>
+              <button type="button" onClick={resetBracketView}>{t.resetView}</button>
             </div>
           </div>
+          <BracketViewport>
+            <BracketBranch side="left" />
+            <div className="bracket-center">
+              <h3>{t.final}</h3>
+              <div className="center-logo-wrap">
+                <img src="/worldcup-2026-logo.png" alt={t.logoAlt} />
+                <span>{t.trophyPath}</span>
+              </div>
+              <BracketCard matchId={104} compact />
+              <h3>{t.thirdPlaceShort}</h3>
+              <BracketCard matchId={103} compact />
+            </div>
+            <BracketBranch side="right" />
+          </BracketViewport>
         </section>
       )}
 
