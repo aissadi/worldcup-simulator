@@ -13,6 +13,7 @@ type Match = { id: number; home: string; away: string; homeSource: string; awayS
 type Flow = "full" | "group" | "singleMatch" | "knockout" | "manual";
 type RoundKey = "roundOf32" | "roundOf16" | "quarterfinals" | "semifinals" | "thirdPlaceMatch" | "final";
 type RoundSetKey = "roundOf16Set" | "quarterfinalsSet" | "semifinalsSet" | "finalSet";
+type HybridStage = "intro" | "strength" | "probability" | "lights" | "spotlight" | "winner";
 type LocaleText = (typeof locales)[LocaleCode];
 type BuilderPick = { first?: string; second?: string; third?: string };
 type ManualMatch = { id: number; home?: string; away?: string; homeSource: string; awaySource: string; winner?: string; label: string; ready: boolean };
@@ -383,6 +384,18 @@ function playWhoosh() {
   window.setTimeout(() => playTone(740, 0.14, "triangle"), 80);
 }
 
+function playStadiumAmbience() {
+  [0, 1800, 3600, 5400, 7200, 9000, 12200, 15200, 18200, 21200, 24400, 28600, 32600, 35200].forEach((delay, index) => {
+    window.setTimeout(() => playTone(95 + (index % 4) * 22, 0.18, index % 2 ? "triangle" : "sawtooth"), delay);
+  });
+}
+
+function playCrowdExplosion() {
+  [0, 80, 160, 240, 340, 460, 620, 820].forEach((delay, index) => {
+    window.setTimeout(() => playTone(180 + index * 70, 0.16, index % 2 ? "triangle" : "sawtooth"), delay);
+  });
+}
+
 function AppHeader({
   t,
   language,
@@ -429,6 +442,9 @@ export default function Home() {
   const [predictionLoading, setPredictionLoading] = useState(false);
   const [predictionMessage, setPredictionMessage] = useState("");
   const [countdown, setCountdown] = useState(3);
+  const [hybridStage, setHybridStage] = useState<HybridStage>("intro");
+  const [hybridElapsed, setHybridElapsed] = useState(0);
+  const [hybridHomeProb, setHybridHomeProb] = useState(50);
   const [roundSetMessage, setRoundSetMessage] = useState("");
   const [copied, setCopied] = useState(false);
   const [revealedMatchIds, setRevealedMatchIds] = useState<Set<number>>(new Set());
@@ -446,6 +462,7 @@ export default function Home() {
   const pinchZoomRef = useRef(1);
   const bracketScrollRef = useRef<HTMLDivElement | null>(null);
   const autoTimersRef = useRef<number[]>([]);
+  const predictorTimersRef = useRef<number[]>([]);
 
   const result = useMemo(() => simulate(seed), [seed]);
   const groupPredictionMatches = useMemo(() => buildGroupPredictionMatches(seed), [seed]);
@@ -488,7 +505,10 @@ export default function Home() {
     });
   }, [phase]);
 
-  useEffect(() => () => clearAutoTimers(), []);
+  useEffect(() => () => {
+    clearAutoTimers();
+    clearPredictorTimers();
+  }, []);
 
   useEffect(() => {
     if (flow !== "full" || !autoRunning || autoPaused) return;
@@ -577,6 +597,16 @@ export default function Home() {
     autoTimersRef.current.push(timer);
   }
 
+  function clearPredictorTimers() {
+    predictorTimersRef.current.forEach((timer) => window.clearTimeout(timer));
+    predictorTimersRef.current = [];
+  }
+
+  function schedulePredictorTimer(callback: () => void, delay: number) {
+    const timer = window.setTimeout(callback, delay);
+    predictorTimersRef.current.push(timer);
+  }
+
   function clampZoom(value: number) {
     return Math.min(1.6, Math.max(0.65, value));
   }
@@ -650,6 +680,9 @@ export default function Home() {
     setPredictionLoading(false);
     setPredictionMessage("");
     setCountdown(3);
+    setHybridStage("intro");
+    setHybridElapsed(0);
+    setHybridHomeProb(50);
     setRoundSetMessage("");
     setCopied(false);
     setRevealedMatchIds(new Set());
@@ -663,6 +696,7 @@ export default function Home() {
     setAutoThirdRevealCount(0);
     setAutoKnockoutStatus("idle");
     clearAutoTimers();
+    clearPredictorTimers();
   }
 
   function openHomeCard(nextFlow: Flow) {
@@ -673,6 +707,9 @@ export default function Home() {
     setPredictionLoading(false);
     setPredictionMessage("");
     setCountdown(3);
+    setHybridStage("intro");
+    setHybridElapsed(0);
+    setHybridHomeProb(50);
     if (nextFlow === "full") {
       setGroupIndex(0);
       setPhase("fullIntro");
@@ -744,11 +781,18 @@ export default function Home() {
     setPredictionLoading(false);
     setPredictionMessage("");
     setCountdown(3);
+    setHybridStage("intro");
+    setHybridElapsed(0);
+    setHybridHomeProb(50);
     setPhase("predictor");
   }
 
   function startPrediction() {
     if (predictionLoading || predictionReady) return;
+    if (flow === "singleMatch") {
+      startHybridPrediction();
+      return;
+    }
     setPredictionLoading(true);
     setPredictionReady(false);
     playDrumRoll();
@@ -765,6 +809,51 @@ export default function Home() {
     }, 4500);
   }
 
+  function startHybridPrediction() {
+    clearPredictorTimers();
+    setPredictionLoading(true);
+    setPredictionReady(false);
+    setHybridStage("intro");
+    setHybridElapsed(0);
+    setHybridHomeProb(50);
+    setCountdown(3);
+    playStadiumAmbience();
+
+    schedulePredictorTimer(() => setHybridStage("strength"), 5000);
+    schedulePredictorTimer(() => {
+      setHybridStage("probability");
+      setHybridHomeProb(50);
+      playDrumRoll();
+    }, 15000);
+    schedulePredictorTimer(() => setHybridStage("lights"), 25000);
+    schedulePredictorTimer(() => {
+      setHybridStage("spotlight");
+      setCountdown(3);
+    }, 30000);
+    schedulePredictorTimer(() => {
+      setHybridStage("winner");
+      playWhoosh();
+      playCrowdExplosion();
+    }, 35000);
+    schedulePredictorTimer(() => {
+      setPredictionLoading(false);
+      setPredictionReady(true);
+      setCountdown(0);
+    }, 40000);
+
+    for (let second = 1; second <= 40; second += 1) {
+      schedulePredictorTimer(() => {
+        setHybridElapsed(second);
+        if (second >= 15 && second <= 25) {
+          const homeBias = currentMatch.winner === currentMatch.home ? 1 : -1;
+          const swing = Math.sin(second * 1.7) * 7 + homeBias * Math.min(8, Math.max(0, second - 18));
+          setHybridHomeProb(Math.round(Math.min(63, Math.max(37, 50 + swing))));
+        }
+        if (second >= 30 && second < 35) setCountdown(Math.max(1, 35 - second));
+      }, second * 1000);
+    }
+  }
+
   function returnAfterPrediction() {
     if (flow === "knockout") {
       setRevealedMatchIds((previous) => new Set(previous).add(currentMatch.id));
@@ -773,6 +862,7 @@ export default function Home() {
     setPredictionReady(false);
     setPredictionLoading(false);
     setPredictionMessage("");
+    clearPredictorTimers();
     if (flow === "knockout" && currentMatch.id === 104) {
       setPhase("champion");
     } else {
@@ -836,10 +926,11 @@ export default function Home() {
     if (flow === "knockout") {
       setRevealedMatchIds((previous) => new Set(previous).add(currentMatch.id));
       setMatchRevealed(true);
-      setPredictionReady(false);
-      setPredictionLoading(false);
-      setPredictionMessage("");
-      setPhase(currentMatch.id === 104 ? "champion" : "knockout");
+    setPredictionReady(false);
+    setPredictionLoading(false);
+    setPredictionMessage("");
+    clearPredictorTimers();
+    setPhase(currentMatch.id === 104 ? "champion" : "knockout");
       return;
     }
     openPredictor(Math.min(matchIndex + 1, groupPredictionMatches.length - 1), "singleMatch");
@@ -847,12 +938,25 @@ export default function Home() {
 
   function goHome() {
     clearAutoTimers();
+    clearPredictorTimers();
     setAutoRunning(false);
     setAutoPaused(false);
     setPhase("home");
     setPredictionLoading(false);
     setPredictionReady(false);
     setGroupLoading(false);
+  }
+
+  function predictAnotherMatch() {
+    clearPredictorTimers();
+    setPredictionReady(false);
+    setPredictionLoading(false);
+    setMatchRevealed(false);
+    setHybridStage("intro");
+    setHybridElapsed(0);
+    setHybridHomeProb(50);
+    setCountdown(3);
+    setPhase("matchSelect");
   }
 
   function isKnockoutMatchAvailable(matchId: number) {
@@ -926,6 +1030,23 @@ export default function Home() {
       clearDownstream(dependentIds);
       return next;
     });
+  }
+
+  function ratingMetric(name: string, metric: "attack" | "defense" | "form" | "momentum") {
+    const selected = team(name);
+    const weights = { attack: 1.04, defense: 0.96, form: 1, momentum: 1.02 };
+    const offsets = { attack: 9, defense: 23, form: 37, momentum: 51 };
+    const hash = [...name].reduce((sum, char) => sum + char.charCodeAt(0), offsets[metric]);
+    return Math.max(52, Math.min(96, Math.round(selected.rating * weights[metric] + (hash % 13) - 7)));
+  }
+
+  function metricRows(match: Match) {
+    return (["attack", "defense", "form", "momentum"] as const).map((metric) => ({
+      key: metric,
+      label: t[metric],
+      home: ratingMetric(match.home, metric),
+      away: ratingMetric(match.away, metric)
+    }));
   }
 
   function BracketCard({ matchId, compact = false }: { matchId: number; compact?: boolean }) {
@@ -1292,33 +1413,103 @@ export default function Home() {
       )}
 
       {phase === "predictor" && currentMatch && (
-        <section className="screen match-screen prediction-screen">
-          <button className="back" onClick={() => setPhase(flow === "singleMatch" ? "matchSelect" : "knockout")}><ChevronLeft size={18} /> {flow === "knockout" ? t.backToKnockoutBracket : t.backToTournament}</button>
-          <p className="step">{t.aiMatchPrediction} · {flow === "singleMatch" ? currentMatch.label : tr(t.matchNumber, { number: String(currentMatch.id) })}</p>
-          {!predictionReady ? (
-            <>
-              <div className={predictionLoading ? "versus-card suspense" : "versus-card"}>
-                <div className="team-side">{flag(currentMatch.home, "large")}<strong>{currentMatch.home}</strong></div>
-                <span className="vs">{t.versus}</span>
-                <div className="team-side">{flag(currentMatch.away, "large")}<strong>{currentMatch.away}</strong></div>
-                {predictionLoading && <div className="suspense-box"><strong>{countdown}</strong><span>{predictionMessage}</span><i /></div>}
-              </div>
-              <button className="primary" disabled={predictionLoading || matchRevealed} onClick={startPrediction}>{matchRevealed ? t.winner : predictionLoading ? t.predicting : t.aiPredictWinner}</button>
-            </>
-          ) : (
-            <>
-              <div className="winner-only-card">
-                <Trophy size={42} />
+        flow === "singleMatch" ? (
+          <section className={`hybrid-predictor ${predictionLoading || predictionReady ? `stage-${hybridStage}` : ""}`}>
+            {(hybridStage === "winner" || predictionReady) && <div className="confetti local" aria-hidden="true"><i /><i /><i /><i /><i /><i /><i /><i /></div>}
+            <button className="back hybrid-back" onClick={predictAnotherMatch}><ChevronLeft size={18} /> {t.back}</button>
+            <div className="hybrid-stadium" aria-hidden="true" />
+            <div className="hybrid-header">
+              <span>{t.hybridReveal}</span>
+              <b>{currentMatch.label}</b>
+            </div>
+            {(!predictionLoading && !predictionReady) ? (
+              <>
+                <div className="hybrid-intro-card">
+                  <div>{flag(currentMatch.home, "huge")}<strong>{currentMatch.home}</strong></div>
+                  <span>{t.versus}</span>
+                  <div>{flag(currentMatch.away, "huge")}<strong>{currentMatch.away}</strong></div>
+                </div>
+                <button className="primary hybrid-start" onClick={startPrediction}>{t.aiPredictWinner}</button>
+              </>
+            ) : hybridStage === "winner" ? (
+              <div className="hybrid-winner">
+                <Trophy size={54} />
                 <strong>{t.winner}</strong>
                 {flag(currentMatch.winner, "huge")}
                 <h2>{currentMatch.winner}</h2>
+                {predictionReady && (
+                  <div className="hybrid-actions">
+                    <button className="primary" onClick={shareWinner}><Share2 size={18} /> {t.sharePrediction}</button>
+                    <button className="secondary" onClick={predictAnotherMatch}>{t.predictAnotherMatch}</button>
+                    <button className="secondary" onClick={goHome}><House size={18} /> {t.home}</button>
+                  </div>
+                )}
               </div>
-              <button className="primary" onClick={nextAfterWinner}>{t.nextMatch}</button>
-              <button className="secondary" onClick={shareWinner}><Share2 size={18} /> {t.shareWinner}</button>
-            </>
-          )}
-          {copied && <p className="copied">{t.copied}</p>}
-        </section>
+            ) : (
+              <>
+                <div className="hybrid-versus">
+                  <div>{flag(currentMatch.home, "large")}<strong>{currentMatch.home}</strong>{hybridStage === "probability" && <b>{hybridHomeProb}%</b>}</div>
+                  <span>{hybridStage === "spotlight" ? countdown : t.versus}</span>
+                  <div>{flag(currentMatch.away, "large")}<strong>{currentMatch.away}</strong>{hybridStage === "probability" && <b>{100 - hybridHomeProb}%</b>}</div>
+                </div>
+                {hybridStage === "strength" && (
+                  <div className="hybrid-bars">
+                    {metricRows(currentMatch).map((row) => (
+                      <article key={row.key}>
+                        <span>{row.label}</span>
+                        <div><i style={{ width: `${row.home}%` }} /><b>{currentMatch.home}</b></div>
+                        <div><i style={{ width: `${row.away}%` }} /><b>{currentMatch.away}</b></div>
+                      </article>
+                    ))}
+                  </div>
+                )}
+                {hybridStage === "probability" && (
+                  <div className="probability-battle">
+                    <i style={{ width: `${hybridHomeProb}%` }} />
+                    <strong>{t.winProbabilityBattle}</strong>
+                  </div>
+                )}
+                {hybridStage === "lights" && (
+                  <div className="lights-out">
+                    <strong>{t.finalAiDecisionLoading}</strong>
+                    <i />
+                  </div>
+                )}
+                {hybridStage === "spotlight" && <p className="spotlight-copy">{t.spotlightReveal}</p>}
+                <p className="hybrid-timer">{hybridElapsed}s / 40s</p>
+              </>
+            )}
+            {copied && <p className="copied">{t.copied}</p>}
+          </section>
+        ) : (
+          <section className="screen match-screen prediction-screen">
+            <button className="back" onClick={() => setPhase("knockout")}><ChevronLeft size={18} /> {t.backToKnockoutBracket}</button>
+            <p className="step">{t.aiMatchPrediction} · {tr(t.matchNumber, { number: String(currentMatch.id) })}</p>
+            {!predictionReady ? (
+              <>
+                <div className={predictionLoading ? "versus-card suspense" : "versus-card"}>
+                  <div className="team-side">{flag(currentMatch.home, "large")}<strong>{currentMatch.home}</strong></div>
+                  <span className="vs">{t.versus}</span>
+                  <div className="team-side">{flag(currentMatch.away, "large")}<strong>{currentMatch.away}</strong></div>
+                  {predictionLoading && <div className="suspense-box"><strong>{countdown}</strong><span>{predictionMessage}</span><i /></div>}
+                </div>
+                <button className="primary" disabled={predictionLoading || matchRevealed} onClick={startPrediction}>{matchRevealed ? t.winner : predictionLoading ? t.predicting : t.aiPredictWinner}</button>
+              </>
+            ) : (
+              <>
+                <div className="winner-only-card">
+                  <Trophy size={42} />
+                  <strong>{t.winner}</strong>
+                  {flag(currentMatch.winner, "huge")}
+                  <h2>{currentMatch.winner}</h2>
+                </div>
+                <button className="primary" onClick={nextAfterWinner}>{t.nextMatch}</button>
+                <button className="secondary" onClick={shareWinner}><Share2 size={18} /> {t.shareWinner}</button>
+              </>
+            )}
+            {copied && <p className="copied">{t.copied}</p>}
+          </section>
+        )
       )}
 
       {phase === "roundSet" && (
