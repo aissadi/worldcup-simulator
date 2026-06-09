@@ -13,7 +13,7 @@ type Match = { id: number; home: string; away: string; homeSource: string; awayS
 type Flow = "full" | "group" | "singleMatch" | "knockout" | "manual";
 type RoundKey = "roundOf32" | "roundOf16" | "quarterfinals" | "semifinals" | "thirdPlaceMatch" | "final";
 type RoundSetKey = "roundOf16Set" | "quarterfinalsSet" | "semifinalsSet" | "finalSet";
-type HybridStage = "intro" | "strength" | "probability" | "lights" | "spotlight" | "winner";
+type HybridStage = "intro" | "probability" | "lights" | "winner";
 type LocaleText = (typeof locales)[LocaleCode];
 type BuilderPick = { first?: string; second?: string; third?: string };
 type ManualMatch = { id: number; home?: string; away?: string; homeSource: string; awaySource: string; winner?: string; label: string; ready: boolean };
@@ -443,7 +443,6 @@ export default function Home() {
   const [predictionMessage, setPredictionMessage] = useState("");
   const [countdown, setCountdown] = useState(3);
   const [hybridStage, setHybridStage] = useState<HybridStage>("intro");
-  const [hybridElapsed, setHybridElapsed] = useState(0);
   const [hybridHomeProb, setHybridHomeProb] = useState(50);
   const [roundSetMessage, setRoundSetMessage] = useState("");
   const [copied, setCopied] = useState(false);
@@ -693,7 +692,6 @@ export default function Home() {
     setPredictionMessage("");
     setCountdown(3);
     setHybridStage("intro");
-    setHybridElapsed(0);
     setHybridHomeProb(50);
     setRoundSetMessage("");
     setCopied(false);
@@ -720,7 +718,6 @@ export default function Home() {
     setPredictionMessage("");
     setCountdown(3);
     setHybridStage("intro");
-    setHybridElapsed(0);
     setHybridHomeProb(50);
     if (nextFlow === "full") {
       setGroupIndex(0);
@@ -794,7 +791,6 @@ export default function Home() {
     setPredictionMessage("");
     setCountdown(3);
     setHybridStage("intro");
-    setHybridElapsed(0);
     setHybridHomeProb(50);
     setPhase("predictor");
   }
@@ -825,45 +821,36 @@ export default function Home() {
     clearPredictorTimers();
     setPredictionLoading(true);
     setPredictionReady(false);
-    setHybridStage("intro");
-    setHybridElapsed(0);
+    setHybridStage("probability");
     setHybridHomeProb(50);
     setCountdown(3);
     playStadiumAmbience();
 
-    schedulePredictorTimer(() => setHybridStage("strength"), 5000);
-    schedulePredictorTimer(() => {
-      setHybridStage("probability");
-      setHybridHomeProb(50);
-      playDrumRoll();
-    }, 15000);
-    schedulePredictorTimer(() => setHybridStage("lights"), 25000);
-    schedulePredictorTimer(() => {
-      setHybridStage("spotlight");
-      setCountdown(3);
-    }, 30000);
+    const battlePath = currentMatch.winner === currentMatch.home
+      ? [52, 49, 55, 58, 61, 57, 63, 59, 64, 60, 66, 62, 67, 64, 69, 66, 70, 68, 71, 69, 72, 70, 73, 71, 74, 72, 75, 73, 76, 74, 77, 75, 78, 76, 79]
+      : [48, 51, 45, 42, 39, 43, 37, 41, 36, 40, 34, 38, 33, 36, 31, 34, 30, 32, 29, 31, 28, 30, 27, 29, 26, 28, 25, 27, 24, 26, 23, 25, 22, 24, 21];
+
+    battlePath.forEach((probability, index) => {
+      schedulePredictorTimer(() => {
+        setHybridHomeProb(probability);
+        playDrumRoll();
+      }, (index + 1) * 1000);
+    });
+
+    schedulePredictorTimer(() => setHybridStage("lights"), 35000);
+    [35200, 36000, 36700, 37300, 37800, 38200, 38600, 39000].forEach((delay) => {
+      schedulePredictorTimer(() => playTone(86, 0.12, "square"), delay);
+    });
     schedulePredictorTimer(() => {
       setHybridStage("winner");
       playWhoosh();
       playCrowdExplosion();
-    }, 35000);
+    }, 40000);
     schedulePredictorTimer(() => {
       setPredictionLoading(false);
       setPredictionReady(true);
       setCountdown(0);
-    }, 40000);
-
-    for (let second = 1; second <= 40; second += 1) {
-      schedulePredictorTimer(() => {
-        setHybridElapsed(second);
-        if (second >= 15 && second <= 25) {
-          const homeBias = currentMatch.winner === currentMatch.home ? 1 : -1;
-          const swing = Math.sin(second * 1.7) * 7 + homeBias * Math.min(8, Math.max(0, second - 18));
-          setHybridHomeProb(Math.round(Math.min(63, Math.max(37, 50 + swing))));
-        }
-        if (second >= 30 && second < 35) setCountdown(Math.max(1, 35 - second));
-      }, second * 1000);
-    }
+    }, 42000);
   }
 
   function returnAfterPrediction() {
@@ -965,7 +952,6 @@ export default function Home() {
     setPredictionLoading(false);
     setMatchRevealed(false);
     setHybridStage("intro");
-    setHybridElapsed(0);
     setHybridHomeProb(50);
     setCountdown(3);
     setPhase("matchSelect");
@@ -1427,7 +1413,7 @@ export default function Home() {
                   <span>{t.versus}</span>
                   <div>{flag(currentMatch.away, "huge")}<strong>{currentMatch.away}</strong></div>
                 </div>
-                <button className="primary hybrid-start" onClick={startPrediction}>{t.aiPredictWinner}</button>
+                <button className="primary hybrid-start" onClick={startPrediction}>{t.startPrediction}</button>
               </>
             ) : hybridStage === "winner" ? (
               <div className="hybrid-winner">
@@ -1447,24 +1433,22 @@ export default function Home() {
               <>
                 <div className="hybrid-versus">
                   <div>{flag(currentMatch.home, "large")}<strong>{currentMatch.home}</strong>{hybridStage === "probability" && <b>{hybridHomeProb}%</b>}</div>
-                  <span>{hybridStage === "spotlight" ? countdown : t.versus}</span>
+                  <span>{t.versus}</span>
                   <div>{flag(currentMatch.away, "large")}<strong>{currentMatch.away}</strong>{hybridStage === "probability" && <b>{100 - hybridHomeProb}%</b>}</div>
                 </div>
-                {hybridStage === "strength" && (
-                  <div className="hybrid-bars">
-                    {metricRows(currentMatch).map((row) => (
-                      <article key={row.key}>
-                        <span>{row.label}</span>
-                        <div><i style={{ width: `${row.home}%` }} /><b>{currentMatch.home}</b></div>
-                        <div><i style={{ width: `${row.away}%` }} /><b>{currentMatch.away}</b></div>
-                      </article>
-                    ))}
-                  </div>
-                )}
                 {hybridStage === "probability" && (
                   <div className="probability-battle">
-                    <i style={{ width: `${hybridHomeProb}%` }} />
                     <strong>{t.winProbabilityBattle}</strong>
+                    <div className="probability-row home">
+                      <span>{currentMatch.home}</span>
+                      <i style={{ width: `${hybridHomeProb}%` }} />
+                      <b>{hybridHomeProb}%</b>
+                    </div>
+                    <div className="probability-row away">
+                      <span>{currentMatch.away}</span>
+                      <i style={{ width: `${100 - hybridHomeProb}%` }} />
+                      <b>{100 - hybridHomeProb}%</b>
+                    </div>
                   </div>
                 )}
                 {hybridStage === "lights" && (
@@ -1473,7 +1457,6 @@ export default function Home() {
                     <i />
                   </div>
                 )}
-                {hybridStage === "spotlight" && <p className="spotlight-copy">{t.spotlightReveal}</p>}
               </>
             )}
             {copied && <p className="copied">{t.copied}</p>}

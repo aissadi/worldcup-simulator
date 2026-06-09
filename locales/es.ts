@@ -89,7 +89,7 @@ const es = {
   form: "Forma",
   momentum: "Momento",
   winProbabilityBattle: "Batalla de Probabilidad",
-  finalAiDecisionLoading: "CARGANDO DECISIÓN FINAL IA...",
+  finalAiDecisionLoading: "BLOQUEANDO PREDICCIÓN FINAL...",
   spotlightReveal: "Revelación con Reflector",
   sharePrediction: "Compartir Predicción",
   predictAnotherMatch: "Predecir Otro Partido",

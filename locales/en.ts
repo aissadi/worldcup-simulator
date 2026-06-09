@@ -89,7 +89,7 @@ const en = {
   form: "Form",
   momentum: "Momentum",
   winProbabilityBattle: "Win Probability Battle",
-  finalAiDecisionLoading: "FINAL AI DECISION LOADING...",
+  finalAiDecisionLoading: "FINAL PREDICTION LOCKING...",
   spotlightReveal: "Spotlight Reveal",
   sharePrediction: "Share Prediction",
   predictAnotherMatch: "Predict Another Match",

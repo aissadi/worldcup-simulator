@@ -89,7 +89,7 @@ const ar = {
   form: "المستوى",
   momentum: "الزخم",
   winProbabilityBattle: "معركة احتمالات الفوز",
-  finalAiDecisionLoading: "جارٍ تحميل القرار النهائي للذكاء الاصطناعي...",
+  finalAiDecisionLoading: "جارٍ تثبيت التوقع النهائي...",
   spotlightReveal: "كشف الضوء",
   sharePrediction: "مشاركة التوقع",
   predictAnotherMatch: "توقع مباراة أخرى",
