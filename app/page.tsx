@@ -1420,10 +1420,6 @@ export default function Home() {
             {(hybridStage === "winner" || predictionReady) && <div className="confetti local" aria-hidden="true"><i /><i /><i /><i /><i /><i /><i /><i /></div>}
             <button className="back hybrid-back" onClick={predictAnotherMatch}><ChevronLeft size={18} /> {t.back}</button>
             <div className="hybrid-stadium" aria-hidden="true" />
-            <div className="hybrid-header">
-              <span>{t.hybridReveal}</span>
-              <b>{currentMatch.label}</b>
-            </div>
             {(!predictionLoading && !predictionReady) ? (
               <>
                 <div className="hybrid-intro-card">
@@ -1478,7 +1474,6 @@ export default function Home() {
                   </div>
                 )}
                 {hybridStage === "spotlight" && <p className="spotlight-copy">{t.spotlightReveal}</p>}
-                <p className="hybrid-timer">{hybridElapsed}s / 40s</p>
               </>
             )}
             {copied && <p className="copied">{t.copied}</p>}
