@@ -1290,6 +1290,10 @@ h2 {
   padding: 10px 0 18px;
   overflow: hidden;
   border-radius: 0;
+  background-image: linear-gradient(rgba(0,0,0,.55), rgba(0,0,0,.75)), url("/stadium-bg.jpg");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
   animation: screenIn 0.45s ease both;
 }
 
@@ -1298,9 +1302,10 @@ h2 {
   inset: 0;
   z-index: -1;
   overflow: hidden;
-  background-image: url("/stadium-background.svg");
+  background-image: linear-gradient(rgba(0,0,0,.55), rgba(0,0,0,.75)), url("/stadium-bg.jpg");
   background-size: cover;
   background-position: center;
+  background-repeat: no-repeat;
   transform: scale(1.08);
   filter: blur(14px) saturate(1.15) brightness(0.82);
   animation: stadiumImageDrift 12s ease-in-out infinite alternate;
