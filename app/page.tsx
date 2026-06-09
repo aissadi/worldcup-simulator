@@ -4,7 +4,7 @@ import { ChevronLeft, House, Share2, Sparkles, Trophy, Volume2, Zap } from "luci
 import { type ReactNode, type TouchEvent, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { languageOptions, locales, type LocaleCode } from "../locales";
 
-type Phase = "home" | "tournamentGroup" | "groupSelect" | "groupReveal" | "matchSelect" | "predictor" | "knockout" | "roundSet" | "champion" | "builderGroup" | "builderThirds" | "builderBracket";
+type Phase = "home" | "fullIntro" | "tournamentGroup" | "groupSelect" | "groupReveal" | "bestThirds" | "matchSelect" | "predictor" | "knockout" | "roundSet" | "champion" | "builderGroup" | "builderThirds" | "builderBracket";
 type Team = { name: string; rating: number; group: string; flag: string; code?: string };
 type Group = { id: string; teams: Team[] };
 type Standing = Team & { played: number; won: number; drawn: number; lost: number; gf: number; ga: number; gd: number; points: number };
@@ -438,9 +438,14 @@ export default function Home() {
   const [manualWinners, setManualWinners] = useState<Record<number, string>>({});
   const [builderWarning, setBuilderWarning] = useState("");
   const [bracketZoom, setBracketZoom] = useState(1);
+  const [autoRunning, setAutoRunning] = useState(false);
+  const [autoPaused, setAutoPaused] = useState(false);
+  const [autoThirdRevealCount, setAutoThirdRevealCount] = useState(0);
+  const [autoKnockoutStatus, setAutoKnockoutStatus] = useState<"idle" | "loading" | "winner">("idle");
   const pinchDistanceRef = useRef<number | null>(null);
   const pinchZoomRef = useRef(1);
   const bracketScrollRef = useRef<HTMLDivElement | null>(null);
+  const autoTimersRef = useRef<number[]>([]);
 
   const result = useMemo(() => simulate(seed), [seed]);
   const groupPredictionMatches = useMemo(() => buildGroupPredictionMatches(seed), [seed]);
@@ -483,8 +488,93 @@ export default function Home() {
     });
   }, [phase]);
 
+  useEffect(() => () => clearAutoTimers(), []);
+
+  useEffect(() => {
+    if (flow !== "full" || !autoRunning || autoPaused) return;
+    clearAutoTimers();
+
+    if (phase === "tournamentGroup") {
+      if (!groupLoading && !groupRevealed) {
+        scheduleAutoTimer(() => revealGroup(), 450);
+      }
+      if (groupRevealed) {
+        scheduleAutoTimer(() => {
+          if (groupIndex < groups.length - 1) {
+            setGroupIndex((current) => current + 1);
+            setGroupRevealed(false);
+          } else {
+            setAutoThirdRevealCount(0);
+            setPhase("bestThirds");
+          }
+        }, 1500);
+      }
+    }
+
+    if (phase === "bestThirds") {
+      if (autoThirdRevealCount < result.bestThirds.length) {
+        scheduleAutoTimer(() => {
+          playWhoosh();
+          setAutoThirdRevealCount((current) => current + 1);
+        }, 620);
+      } else {
+        scheduleAutoTimer(() => {
+          setMatchIndex(0);
+          setRevealedMatchIds(new Set());
+          setAutoKnockoutStatus("idle");
+          setPhase("knockout");
+        }, 1200);
+      }
+    }
+
+    if (phase === "knockout") {
+      const match = knockoutMatches[matchIndex];
+      if (!match) return;
+      if (autoKnockoutStatus === "idle" && isKnockoutMatchAvailable(match.id)) {
+        scheduleAutoTimer(() => {
+          panBracketToRound(roundKey(match.id));
+          setAutoKnockoutStatus("loading");
+          playDrumRoll();
+        }, 700);
+      }
+      if (autoKnockoutStatus === "loading") {
+        scheduleAutoTimer(() => {
+          setRevealedMatchIds((previous) => new Set(previous).add(match.id));
+          setAutoKnockoutStatus("winner");
+          playWhoosh();
+        }, 4600);
+      }
+      if (autoKnockoutStatus === "winner") {
+        scheduleAutoTimer(() => {
+          if (match.id === 104) {
+            setAutoRunning(false);
+            setPhase("champion");
+            return;
+          }
+          const nextIndex = matchIndex + 1;
+          const nextMatch = knockoutMatches[nextIndex];
+          setMatchIndex(nextIndex);
+          setAutoKnockoutStatus("idle");
+          if (nextMatch) panBracketToRound(roundKey(nextMatch.id));
+        }, 1500);
+      }
+    }
+
+    return () => clearAutoTimers();
+  }, [phase, flow, autoRunning, autoPaused, groupLoading, groupRevealed, groupIndex, autoThirdRevealCount, autoKnockoutStatus, matchIndex, result.bestThirds.length, revealedMatchIds]);
+
   function tr(template: string, values: Record<string, string>) {
     return Object.entries(values).reduce((text, [key, value]) => text.replaceAll(`{${key}}`, value), template);
+  }
+
+  function clearAutoTimers() {
+    autoTimersRef.current.forEach((timer) => window.clearTimeout(timer));
+    autoTimersRef.current = [];
+  }
+
+  function scheduleAutoTimer(callback: () => void, delay: number) {
+    const timer = window.setTimeout(callback, delay);
+    autoTimersRef.current.push(timer);
   }
 
   function clampZoom(value: number) {
@@ -501,6 +591,23 @@ export default function Home() {
       const viewport = bracketScrollRef.current;
       if (!viewport) return;
       viewport.scrollLeft = 0;
+      viewport.scrollTop = 0;
+    });
+  }
+
+  function panBracketToRound(key: RoundKey) {
+    const positions: Record<RoundKey, number> = {
+      roundOf32: 0,
+      roundOf16: 320,
+      quarterfinals: 630,
+      semifinals: 920,
+      final: 1180,
+      thirdPlaceMatch: 1180
+    };
+    window.requestAnimationFrame(() => {
+      const viewport = bracketScrollRef.current;
+      if (!viewport) return;
+      viewport.scrollLeft = positions[key];
       viewport.scrollTop = 0;
     });
   }
@@ -551,6 +658,11 @@ export default function Home() {
     setBuilderThirdGroups([]);
     setManualWinners({});
     setBuilderWarning("");
+    setAutoRunning(false);
+    setAutoPaused(false);
+    setAutoThirdRevealCount(0);
+    setAutoKnockoutStatus("idle");
+    clearAutoTimers();
   }
 
   function openHomeCard(nextFlow: Flow) {
@@ -561,7 +673,10 @@ export default function Home() {
     setPredictionLoading(false);
     setPredictionMessage("");
     setCountdown(3);
-    if (nextFlow === "full") setPhase("tournamentGroup");
+    if (nextFlow === "full") {
+      setGroupIndex(0);
+      setPhase("fullIntro");
+    }
     if (nextFlow === "group") setPhase("groupSelect");
     if (nextFlow === "singleMatch") setPhase("matchSelect");
     if (nextFlow === "knockout") setPhase("knockout");
@@ -573,6 +688,23 @@ export default function Home() {
       setBuilderWarning("");
       setPhase("builderGroup");
     }
+  }
+
+  function startFullPrediction() {
+    clearAutoTimers();
+    setFlow("full");
+    setGroupIndex(0);
+    setSelectedGroupIndex(0);
+    setGroupRevealed(false);
+    setGroupLoading(false);
+    setGroupMessage("");
+    setMatchIndex(0);
+    setRevealedMatchIds(new Set());
+    setAutoThirdRevealCount(0);
+    setAutoKnockoutStatus("idle");
+    setAutoPaused(false);
+    setAutoRunning(true);
+    setPhase("tournamentGroup");
   }
 
   function revealGroup() {
@@ -694,6 +826,12 @@ export default function Home() {
     share(tr(t.shareWinnerText, { winner: currentMatch.winner, url }));
   }
 
+  function runAgain() {
+    const restartFullPrediction = flow === "full";
+    reset(seed + 1);
+    if (restartFullPrediction) setPhase("fullIntro");
+  }
+
   function nextAfterWinner() {
     if (flow === "knockout") {
       setRevealedMatchIds((previous) => new Set(previous).add(currentMatch.id));
@@ -708,6 +846,9 @@ export default function Home() {
   }
 
   function goHome() {
+    clearAutoTimers();
+    setAutoRunning(false);
+    setAutoPaused(false);
     setPhase("home");
     setPredictionLoading(false);
     setPredictionReady(false);
@@ -895,7 +1036,12 @@ export default function Home() {
 
   const groupScreen = (
     <section className="screen">
-      <button className="back" onClick={() => setPhase(flow === "group" ? "groupSelect" : "home")}><ChevronLeft size={18} /> {t.back}</button>
+      <button className="back" onClick={() => flow === "group" ? setPhase("groupSelect") : goHome()}><ChevronLeft size={18} /> {t.back}</button>
+      {flow === "full" && autoRunning && (
+        <button className="secondary compact-action" onClick={() => setAutoPaused((current) => !current)}>
+          {autoPaused ? t.resumePrediction : t.pausePrediction}
+        </button>
+      )}
       <p className="step">{t.group} {currentGroup.group}</p>
       <h2>{t.group} {currentGroup.group}</h2>
       {!groupRevealed ? (
@@ -919,7 +1065,9 @@ export default function Home() {
         </div>
       )}
       {groupLoading && <div className="loading-card"><Volume2 size={20} /><strong>{groupMessage}</strong><i /></div>}
-      {!groupRevealed ? <button className="primary" disabled={groupLoading} onClick={revealGroup}>{groupLoading ? t.revealing : t.revealGroup}</button> : <button className="primary" onClick={continueAfterGroup}>{flow === "full" ? groupIndex === 11 ? t.startKnockouts : `${t.nextGroup} ${groups[groupIndex + 1].id}` : t.backToGroups}</button>}
+      {flow === "full" ? (
+        <p className="auto-status">{autoPaused ? t.paused : groupLoading ? t.revealing : groupRevealed ? t.autoAdvancing : t.runningPrediction}</p>
+      ) : !groupRevealed ? <button className="primary" disabled={groupLoading} onClick={revealGroup}>{groupLoading ? t.revealing : t.revealGroup}</button> : <button className="primary" onClick={continueAfterGroup}>{t.backToGroups}</button>}
     </section>
   );
 
@@ -941,6 +1089,17 @@ export default function Home() {
             <button className="home-card" onClick={() => openHomeCard("knockout")}><b>{t.knockoutStagePredictions}</b><span>{t.aiMode}</span></button>
             <button className="home-card" onClick={() => openHomeCard("manual")}><b>{t.buildYourPredictions}</b><span>{t.manualBuilderMode}</span></button>
           </div>
+        </section>
+      )}
+
+      {phase === "fullIntro" && (
+        <section className="screen champion-screen">
+          <div className="trophy-glow"><Trophy size={80} /></div>
+          <p className="kicker">{t.fullTournamentPrediction}</p>
+          <h2>{t.fullIntroTitle}</h2>
+          <p className="subtitle">{t.fullIntroSubtitle}</p>
+          <button className="primary" onClick={startFullPrediction}>{t.startPrediction}</button>
+          <button className="secondary" onClick={() => setPhase("home")}><ChevronLeft size={18} /> {t.back}</button>
         </section>
       )}
 
@@ -988,6 +1147,28 @@ export default function Home() {
             })}
           </div>
           <button className="primary" disabled={builderThirdGroups.length !== 8} onClick={() => setPhase("builderBracket")}>{t.buildBracket}</button>
+        </section>
+      )}
+
+      {phase === "bestThirds" && (
+        <section className="screen champion-screen">
+          <button className="secondary compact-action" onClick={() => setAutoPaused((current) => !current)}>
+            {autoPaused ? t.resumePrediction : t.pausePrediction}
+          </button>
+          <div className="trophy-glow"><Zap size={72} /></div>
+          <p className="kicker">{t.wildcardDrama}</p>
+          <h2>{t.bestThirdPlaceTeams}</h2>
+          <div className="standings">
+            {result.bestThirds.slice(0, autoThirdRevealCount).map((item, index) => (
+              <article className="standing-card third" key={item.name} style={{ animationDelay: `${index * 120}ms` }}>
+                <span className="place">{index + 1}</span>
+                {flag(item.name)}
+                <div><strong>{item.name}</strong><em>{t.thirdQualified}</em></div>
+                <b>{item.points} {t.pointsShort}</b>
+              </article>
+            ))}
+          </div>
+          <p className="auto-status">{autoPaused ? t.paused : t.runningPrediction}</p>
         </section>
       )}
 
@@ -1066,6 +1247,11 @@ export default function Home() {
               <button type="button" onClick={() => zoomBracket(-0.15)}>{t.zoomOut}</button>
               <button type="button" onClick={resetBracketView}>{t.resetView}</button>
             </div>
+            {flow === "full" && autoRunning && (
+              <button className="secondary compact-action" onClick={() => setAutoPaused((current) => !current)}>
+                {autoPaused ? t.resumePrediction : t.pausePrediction}
+              </button>
+            )}
           </div>
           <BracketViewport>
             <BracketBranch side="left" />
@@ -1081,6 +1267,27 @@ export default function Home() {
             </div>
             <BracketBranch side="right" />
           </BracketViewport>
+          {flow === "full" && autoRunning && currentMatch && (
+            <div className={autoKnockoutStatus === "winner" ? "auto-match-overlay winner" : "auto-match-overlay"}>
+              {autoKnockoutStatus === "winner" ? (
+                <>
+                  <Trophy size={36} />
+                  <strong>{t.winner}</strong>
+                  {flag(currentMatch.winner, "large")}
+                  <h2>{currentMatch.winner}</h2>
+                </>
+              ) : (
+                <>
+                  <span>{tr(t.matchNumber, { number: String(currentMatch.id) })}</span>
+                  <div>{flag(currentMatch.home)}<b>{currentMatch.home}</b></div>
+                  <em>{t.versus}</em>
+                  <div>{flag(currentMatch.away)}<b>{currentMatch.away}</b></div>
+                  <p>{autoPaused ? t.paused : autoKnockoutStatus === "loading" ? t.predicting : t.runningPrediction}</p>
+                  {autoKnockoutStatus === "loading" && <i />}
+                </>
+              )}
+            </div>
+          )}
         </section>
       )}
 
@@ -1126,8 +1333,9 @@ export default function Home() {
         <section className="screen champion-screen">
           <div className="trophy-glow"><Trophy size={88} /></div>
           <h2>{flag(displayChampion, "large")} {tr(t.championLine, { team: displayChampion })}</h2>
-          <button className="primary" onClick={shareResult}><Share2 size={18} /> {t.shareMyResult}</button>
-          <button className="secondary" onClick={() => reset()}><Sparkles size={18} /> {t.tryAgain}</button>
+          <button className="primary" onClick={shareResult}><Share2 size={18} /> {t.shareResult}</button>
+          <button className="secondary" onClick={runAgain}><Sparkles size={18} /> {t.runAgain}</button>
+          <button className="secondary" onClick={goHome}><House size={18} /> {t.home}</button>
           {copied && <p className="copied">{t.copied}</p>}
         </section>
       )}
