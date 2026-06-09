@@ -18,6 +18,9 @@ type LocaleText = (typeof locales)[LocaleCode];
 type BuilderPick = { first?: string; second?: string; third?: string };
 type ManualMatch = { id: number; home?: string; away?: string; homeSource: string; awaySource: string; winner?: string; label: string; ready: boolean };
 
+const BRACKET_CANVAS_WIDTH = 1800;
+const BRACKET_CANVAS_HEIGHT = 1540;
+
 const flagEmoji: Record<string, string> = {
   "Mexico": "🇲🇽", "South Africa": "🇿🇦", "South Korea": "🇰🇷", "Czechia": "🇨🇿",
   "Canada": "🇨🇦", "Bosnia and Herzegovina": "🇧🇦", "Qatar": "🇶🇦", "Switzerland": "🇨🇭",
@@ -453,6 +456,7 @@ export default function Home() {
   const [manualWinners, setManualWinners] = useState<Record<number, string>>({});
   const [builderWarning, setBuilderWarning] = useState("");
   const [bracketZoom, setBracketZoom] = useState(1);
+  const [bracketFitScale, setBracketFitScale] = useState(1);
   const [autoRunning, setAutoRunning] = useState(false);
   const [autoPaused, setAutoPaused] = useState(false);
   const [autoThirdRevealCount, setAutoThirdRevealCount] = useState(0);
@@ -460,6 +464,7 @@ export default function Home() {
   const pinchDistanceRef = useRef<number | null>(null);
   const pinchZoomRef = useRef(1);
   const bracketScrollRef = useRef<HTMLDivElement | null>(null);
+  const bracketViewportRef = useRef<HTMLDivElement | null>(null);
   const autoTimersRef = useRef<number[]>([]);
   const predictorTimersRef = useRef<number[]>([]);
 
@@ -495,13 +500,30 @@ export default function Home() {
 
   useLayoutEffect(() => {
     if (phase !== "knockout" && phase !== "builderBracket") return;
-    setBracketZoom(phase === "knockout" && flow === "full" ? 0.42 : 1);
+    setBracketZoom(1);
     window.requestAnimationFrame(() => {
       const viewport = bracketScrollRef.current;
       if (!viewport) return;
       viewport.scrollLeft = 0;
       viewport.scrollTop = 0;
     });
+  }, [phase]);
+
+  useLayoutEffect(() => {
+    if (phase !== "knockout" && phase !== "builderBracket") return;
+
+    function updateBracketFit() {
+      const viewport = bracketViewportRef.current;
+      if (!viewport) return;
+      const bounds = viewport.getBoundingClientRect();
+      const widthScale = bounds.width / BRACKET_CANVAS_WIDTH;
+      const heightScale = bounds.height / BRACKET_CANVAS_HEIGHT;
+      setBracketFitScale(Math.min(widthScale, heightScale, 1));
+    }
+
+    updateBracketFit();
+    window.addEventListener("resize", updateBracketFit);
+    return () => window.removeEventListener("resize", updateBracketFit);
   }, [phase]);
 
   useEffect(() => () => {
@@ -628,28 +650,23 @@ export default function Home() {
   }
 
   function showBracketOverview() {
-    setBracketZoom(0.42);
+    setBracketZoom(1);
     window.requestAnimationFrame(() => {
       const viewport = bracketScrollRef.current;
       if (!viewport) return;
-      viewport.scrollTo({ left: 0, top: 0, behavior: "smooth" });
+      viewport.scrollLeft = 0;
+      viewport.scrollTop = 0;
     });
   }
 
   function focusBracketRound(key: RoundKey) {
-    const positions: Record<RoundKey, number> = {
-      roundOf32: 0,
-      roundOf16: 210,
-      quarterfinals: 410,
-      semifinals: 600,
-      final: 760,
-      thirdPlaceMatch: 760
-    };
-    setBracketZoom(0.72);
+    void key;
+    setBracketZoom(1);
     window.requestAnimationFrame(() => {
       const viewport = bracketScrollRef.current;
       if (!viewport) return;
-      viewport.scrollTo({ left: positions[key], top: 0, behavior: "smooth" });
+      viewport.scrollLeft = 0;
+      viewport.scrollTop = 0;
     });
   }
 
@@ -1142,10 +1159,11 @@ export default function Home() {
   }
 
   function BracketViewport({ children }: { children: ReactNode }) {
+    const scale = bracketFitScale * bracketZoom;
     return (
-      <div className="bracket-viewport" ref={bracketScrollRef} onTouchStart={startBracketTouch} onTouchMove={moveBracketTouch} onTouchEnd={endBracketTouch}>
-        <div className="bracket-canvas" style={{ width: `${1800 * bracketZoom}px`, minHeight: `${2400 * bracketZoom}px` }}>
-          <div className="bracket-stage" style={{ transform: `scale(${bracketZoom})` }}>
+      <div className="bracket-viewport" ref={(node) => { bracketScrollRef.current = node; bracketViewportRef.current = node; }}>
+        <div className="bracket-canvas" style={{ width: `${BRACKET_CANVAS_WIDTH * scale}px`, height: `${BRACKET_CANVAS_HEIGHT * scale}px` }}>
+          <div className="bracket-stage" style={{ transform: `scale(${scale})` }}>
             {children}
           </div>
         </div>

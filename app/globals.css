@@ -709,32 +709,31 @@ h2 {
 .bracket-viewport {
   width: 100vw;
   height: calc(100dvh - var(--header-height));
-  overflow-x: auto;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  touch-action: pan-x pan-y pinch-zoom;
-  overscroll-behavior: contain;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  overflow: hidden;
+  touch-action: manipulation;
   padding: 0;
-  scrollbar-color: var(--gold) rgba(255, 255, 255, 0.08);
 }
 
 .bracket-canvas {
   position: relative;
   width: 1800px;
-  min-width: 1800px;
-  min-height: 2400px;
-  transform-origin: top left;
+  height: 1540px;
+  flex: 0 0 auto;
+  transform-origin: top center;
 }
 
 .bracket-stage {
   width: 1800px;
   min-width: 1800px;
-  min-height: 2400px;
+  min-height: 1540px;
   display: flex;
   align-items: flex-start;
   gap: 18px;
   padding: 150px 18px 18px;
-  transform-origin: top left;
+  transform-origin: top center;
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 28px;
   background:
@@ -1058,6 +1057,23 @@ h2 {
 
 .bracket-team.winner strong {
   color: var(--gold);
+}
+
+.bracket-card.revealed .bracket-team {
+  filter: grayscale(1);
+  opacity: 0.35;
+}
+
+.bracket-card.revealed .bracket-team.winner {
+  filter: none;
+  opacity: 1;
+  border-radius: 999px;
+  background: rgba(34, 229, 140, 0.1);
+  box-shadow: 0 0 22px rgba(248, 200, 78, 0.34), 0 0 18px rgba(34, 229, 140, 0.2);
+}
+
+.bracket-card.revealed .bracket-team.winner .flag {
+  box-shadow: 0 0 20px rgba(248, 200, 78, 0.58), 0 0 16px rgba(34, 229, 140, 0.28);
 }
 
 .bracket-center {
@@ -1824,6 +1840,16 @@ h2 {
 @media (max-width: 719px) {
   .bracket-toolbar {
     max-width: none;
+    padding: 8px 10px;
+  }
+
+  .bracket-toolbar h2 {
+    font-size: 22px;
+  }
+
+  .bracket-toolbar .step,
+  .bracket-toolbar .bracket-help {
+    font-size: 11px;
   }
 
   .bracket-stage {
@@ -1832,25 +1858,7 @@ h2 {
     border-radius: 20px;
   }
 
-  .bracket-card::after {
-    display: none;
-  }
-
-  .bracket-card::before {
-    content: "Winner advances \2192";
-    position: absolute;
-    right: 10px;
-    bottom: 7px;
-    color: rgba(248, 200, 78, 0.82);
-    font-size: 9px;
-    font-weight: 900;
-    text-transform: uppercase;
-    pointer-events: none;
-  }
-
-  .bracket-card.revealed::before {
-    color: var(--green);
-  }
+  .bracket-card::after { display: block; }
 }
 
 @media (min-width: 720px) {
