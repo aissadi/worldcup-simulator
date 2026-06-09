@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronLeft, House, Share2, Sparkles, Trophy, Volume2, Zap } from "lucide-react";
-import { type TouchEvent, useEffect, useMemo, useRef, useState } from "react";
+import { type TouchEvent, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { languageOptions, locales, type LocaleCode } from "../locales";
 
 type Phase = "home" | "tournamentGroup" | "groupSelect" | "groupReveal" | "matchSelect" | "predictor" | "knockout" | "roundSet" | "champion" | "builderGroup" | "builderThirds" | "builderBracket";
@@ -472,7 +472,7 @@ export default function Home() {
     pinchZoomRef.current = bracketZoom;
   }, [bracketZoom]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (phase !== "knockout" && phase !== "builderBracket") return;
     setBracketZoom(1);
     window.requestAnimationFrame(() => {
