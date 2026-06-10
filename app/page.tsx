@@ -464,6 +464,8 @@ export default function Home() {
   const [manualWinners, setManualWinners] = useState<Record<number, string>>({});
   const [builderWarning, setBuilderWarning] = useState("");
   const [matchTeamFilter, setMatchTeamFilter] = useState("");
+  const [selectedTeam, setSelectedTeam] = useState("");
+  const [teamSearch, setTeamSearch] = useState("");
   const [bracketZoom, setBracketZoom] = useState(1);
   const [bracketFitScale, setBracketFitScale] = useState(1);
   const [autoRunning, setAutoRunning] = useState(false);
@@ -479,18 +481,37 @@ export default function Home() {
 
   const result = useMemo(() => simulate(seed), [seed]);
   const groupPredictionMatches = useMemo(() => buildGroupPredictionMatches(seed), [seed]);
-  const favoriteTeams = ["Morocco", "Argentina", "Brazil", "France", "Spain"];
+  const popularTeams = ["Morocco", "Argentina", "Brazil", "France", "Spain"];
+  const selectedTeamMatches = selectedTeam
+    ? groupPredictionMatches.filter((match) => match.home === selectedTeam || match.away === selectedTeam)
+    : [];
   const featuredMatchIndex = useMemo(() => {
-    const featuredPool = groupPredictionMatches
-      .map((match, index) => ({ match, index }))
-      .filter(({ match }) => favoriteTeams.includes(match.home) || favoriteTeams.includes(match.away));
-    const pool = featuredPool.length ? featuredPool : groupPredictionMatches.map((match, index) => ({ match, index }));
-    return pool[Math.floor(rngFrom(seed + 2026)() * pool.length)]?.index ?? 0;
-  }, [groupPredictionMatches, seed]);
+    const indexedMatches = groupPredictionMatches.map((match, index) => ({ match, index }));
+    const selectedPool = selectedTeam
+      ? indexedMatches.filter(({ match }) => match.home === selectedTeam || match.away === selectedTeam)
+      : [];
+    const featuredPool = indexedMatches.filter(({ match }) => popularTeams.includes(match.home) || popularTeams.includes(match.away));
+    const pool = selectedPool.length ? selectedPool : featuredPool.length ? featuredPool : indexedMatches;
+    return pool[Math.floor(rngFrom(seed + 2026 + selectedTeam.length * 17)() * pool.length)]?.index ?? 0;
+  }, [groupPredictionMatches, seed, selectedTeam]);
   const featuredMatch = groupPredictionMatches[featuredMatchIndex];
-  const filteredPredictionMatches = matchTeamFilter
-    ? groupPredictionMatches.filter((match) => match.home === matchTeamFilter || match.away === matchTeamFilter)
-    : groupPredictionMatches;
+  const filteredPredictionMatches = useMemo(() => {
+    if (matchTeamFilter) {
+      return groupPredictionMatches.filter((match) => match.home === matchTeamFilter || match.away === matchTeamFilter);
+    }
+    if (!selectedTeam) return groupPredictionMatches;
+    const selected: Match[] = [];
+    const rest: Match[] = [];
+    groupPredictionMatches.forEach((match) => {
+      (match.home === selectedTeam || match.away === selectedTeam ? selected : rest).push(match);
+    });
+    return [...selected, ...rest];
+  }, [groupPredictionMatches, matchTeamFilter, selectedTeam]);
+  const selectedTeamObject = allTeams.find((item) => item.name === selectedTeam);
+  const selectedTeamGroupIndex = selectedTeam
+    ? groups.findIndex((group) => group.teams.some((item) => item.name === selectedTeam))
+    : -1;
+  const teamSearchResults = allTeams.filter((item) => item.name.toLowerCase().includes(teamSearch.trim().toLowerCase()));
   const t = locales[language];
   const isRtl = t.dir === "rtl";
   const currentGroupIndex = flow === "group" ? selectedGroupIndex : groupIndex;
@@ -507,6 +528,8 @@ export default function Home() {
   useEffect(() => {
     const saved = window.localStorage.getItem("worldcup-language") as LocaleCode | null;
     if (saved && saved in locales) setLanguage(saved);
+    const savedTeam = window.localStorage.getItem("worldcup-selected-team");
+    if (savedTeam && allTeams.some((item) => item.name === savedTeam)) setSelectedTeam(savedTeam);
   }, []);
 
   useEffect(() => {
@@ -514,6 +537,14 @@ export default function Home() {
     document.documentElement.lang = t.langCode;
     document.documentElement.dir = t.dir;
   }, [language, t.dir, t.langCode]);
+
+  useEffect(() => {
+    if (selectedTeam) {
+      window.localStorage.setItem("worldcup-selected-team", selectedTeam);
+      return;
+    }
+    window.localStorage.removeItem("worldcup-selected-team");
+  }, [selectedTeam]);
 
   useEffect(() => {
     pinchZoomRef.current = bracketZoom;
@@ -781,7 +812,14 @@ export default function Home() {
       setGroupIndex(0);
       setPhase("fullIntro");
     }
-    if (nextFlow === "group") setPhase("groupSelect");
+    if (nextFlow === "group") {
+      if (selectedTeamGroupIndex >= 0) {
+        setSelectedGroupIndex(selectedTeamGroupIndex);
+        setPhase("groupReveal");
+      } else {
+        setPhase("groupSelect");
+      }
+    }
     if (nextFlow === "singleMatch") setPhase("matchSelect");
     if (nextFlow === "knockout") setPhase("knockout");
     if (nextFlow === "manual") {
@@ -797,6 +835,25 @@ export default function Home() {
   function openTeamPredictions(team: string) {
     setMatchTeamFilter(team);
     openHomeCard("singleMatch");
+  }
+
+  function selectTeam(teamName: string) {
+    setSelectedTeam(teamName);
+    setMatchTeamFilter(teamName);
+    setTeamSearch("");
+  }
+
+  function openSelectedTeamGroup() {
+    if (selectedTeamGroupIndex >= 0) {
+      setFlow("group");
+      setSelectedGroupIndex(selectedTeamGroupIndex);
+      setGroupRevealed(false);
+      setGroupLoading(false);
+      setGroupMessage("");
+      setPhase("groupReveal");
+      return;
+    }
+    openHomeCard("group");
   }
 
   function openFeaturedPrediction() {
@@ -1173,11 +1230,12 @@ export default function Home() {
     const isCurrent = isFocusActive && currentMatch?.id === matchId;
     const homeName = sourceLabel(matchId, "home");
     const awayName = sourceLabel(matchId, "away");
+    const followsSelectedTeam = Boolean(selectedTeam && [homeName, awayName, match.winner].includes(selectedTeam));
     const placement = bracketRows.get(matchId);
     return (
       <button
         type="button"
-        className={`${compact ? "bracket-card compact" : "bracket-card"} ${revealed ? "revealed" : ""} ${isCurrent ? "current-reveal" : ""}`}
+        className={`${compact ? "bracket-card compact" : "bracket-card"} ${revealed ? "revealed" : ""} ${isCurrent ? "current-reveal" : ""} ${followsSelectedTeam ? "team-path" : ""}`}
         style={placement ? { gridRow: `${placement.row} / span ${placement.span}` } : undefined}
         onClick={() => openKnockoutMatch(matchId)}
         disabled={!available}
@@ -1269,11 +1327,12 @@ export default function Home() {
     const isCurrent = isFocusActive && currentMatch?.id === matchId;
     const homeName = available && match ? match.home : "";
     const awayName = available && match ? match.away : "";
+    const followsSelectedTeam = Boolean(selectedTeam && [homeName, awayName, match?.winner].includes(selectedTeam));
 
     return (
       <button
         type="button"
-        className={`mobile-match-card ${revealed ? "revealed" : ""} ${isCurrent ? "current-reveal" : ""}`}
+        className={`mobile-match-card ${revealed ? "revealed" : ""} ${isCurrent ? "current-reveal" : ""} ${followsSelectedTeam ? "team-path" : ""}`}
         onClick={() => openKnockoutMatch(matchId)}
         disabled={!available}
         aria-label={available ? `${tr(t.matchNumber, { number: String(matchId) })}: ${homeName} ${t.versus} ${awayName}` : `${tr(t.matchNumber, { number: String(matchId) })} ${t.locked}`}
@@ -1364,7 +1423,11 @@ export default function Home() {
       <h2>{t.group} {currentGroup.group}</h2>
       {!groupRevealed ? (
         <div className="team-list">
-          {groups[currentGroupIndex].teams.map((item) => <div className="team-row" key={item.name}>{flag(item.name)}<strong>{item.name}</strong></div>)}
+          {groups[currentGroupIndex].teams.map((item) => (
+            <div className={selectedTeam === item.name ? "team-row selected-team-row" : "team-row"} key={item.name}>
+              {flag(item.name)}<strong>{item.name}</strong>
+            </div>
+          ))}
         </div>
       ) : (
         <div className="standings">
@@ -1372,7 +1435,7 @@ export default function Home() {
             const third = index === 2 && thirdQualified.has(item.name);
             const label = index === 0 ? t.firstQualified : index === 1 ? t.secondQualified : third ? t.thirdQualified : t.eliminated;
             return (
-              <article className={index < 2 ? "standing-card qualified" : third ? "standing-card third" : "standing-card out"} key={item.name} style={{ animationDelay: `${index * 190}ms` }}>
+              <article className={`${index < 2 ? "standing-card qualified" : third ? "standing-card third" : "standing-card out"} ${selectedTeam === item.name ? "selected-team-row" : ""}`} key={item.name} style={{ animationDelay: `${index * 190}ms` }}>
                 <span className="place">{index + 1}</span>
                 {flag(item.name)}
                 <div><strong>{item.name}</strong><em>{label}</em></div>
@@ -1401,7 +1464,7 @@ export default function Home() {
             <img className="landing-logo" src="/worldcup-2026-logo.png" alt={t.logoAlt} />
             <Trophy size={68} />
           </div>
-          <h1>{t.homeTitle}</h1>
+          <h1><span>{t.homeTitleLine1}</span><span>{t.homeTitleLine2}</span><span>{t.homeTitleLine3}</span></h1>
           <p className="subtitle">{t.homeSubtitle}</p>
           <button className="quick-predict" onClick={startFullPrediction}>
             <Sparkles size={22} />
@@ -1425,14 +1488,58 @@ export default function Home() {
               <button className="primary" onClick={openFeaturedPrediction}>{t.predictNow}</button>
             </section>
           )}
-          <section className="team-shortcuts">
-            <p className="kicker">{t.myTeamShortcuts}</p>
-            <div>
-              {favoriteTeams.map((team) => (
-                <button key={team} onClick={() => openTeamPredictions(team)}>{flag(team)} {team}</button>
+          <section className="team-selector-panel">
+            <p className="kicker">{t.chooseYourTeam}</p>
+            <h2>{t.chooseYourTeam}</h2>
+            <p>{t.chooseTeamSubtitle}</p>
+            <label className="team-search">
+              <span>{t.searchTeams}</span>
+              <input
+                value={teamSearch}
+                onChange={(event) => setTeamSearch(event.target.value)}
+                placeholder={t.searchTeams}
+              />
+            </label>
+            <div className="team-selector-grid">
+              {teamSearchResults.map((item) => (
+                <button
+                  className={selectedTeam === item.name ? "selected" : ""}
+                  key={item.name}
+                  type="button"
+                  onClick={() => selectTeam(item.name)}
+                >
+                  {flag(item.name)}
+                  <span>{item.name}</span>
+                </button>
               ))}
             </div>
+            {selectedTeam && <p className="selected-team-note">✓ {tr(t.teamSelected, { team: selectedTeam })}</p>}
           </section>
+          {selectedTeam && selectedTeamObject && (
+            <section className="team-hub">
+              <p className="kicker">{t.myTeamHub}</p>
+              <div className="team-hub-title">
+                {flag(selectedTeam)}
+                <strong>{selectedTeamObject.name}</strong>
+              </div>
+              <p>{tr(t.upcomingPredictionsCount, { count: String(selectedTeamMatches.length) })}</p>
+              <div className="team-hub-list">
+                {selectedTeamMatches.slice(0, 5).map((match) => {
+                  const index = groupPredictionMatches.findIndex((item) => item.id === match.id);
+                  return (
+                    <button key={match.id} type="button" onClick={() => openPredictor(index, "singleMatch")}>
+                      <span>{flag(match.home)} {match.home}</span>
+                      <em>{t.versus}</em>
+                      <span>{flag(match.away)} {match.away}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <button className="primary" onClick={() => openTeamPredictions(selectedTeam)}>
+                {tr(t.viewAllTeamPredictions, { team: selectedTeam })}
+              </button>
+            </section>
+          )}
         </section>
       )}
 
