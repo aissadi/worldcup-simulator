@@ -95,7 +95,7 @@ const mobileBracketStages = [
   { key: "roundOf16", ids: [89, 90, 91, 92, 93, 94, 95, 96] },
   { key: "quarterfinals", ids: [97, 98, 99, 100] },
   { key: "semifinals", ids: [101, 102] },
-  { key: "final", ids: [104] }
+  { key: "final", ids: [104, 103] }
 ] as const;
 const bracketRows = new Map<number, { row: number; span: number }>([
   [73, { row: 1, span: 2 }], [75, { row: 3, span: 2 }], [74, { row: 5, span: 2 }], [77, { row: 7, span: 2 }],
@@ -1118,13 +1118,15 @@ export default function Home() {
     const match = item.match;
     const available = isKnockoutMatchAvailable(matchId);
     const revealed = revealedMatchIds.has(matchId);
+    const isFocusActive = flow === "full" && phase === "knockout" && ["loading", "winner", "championDecision"].includes(autoKnockoutStatus);
+    const isCurrent = isFocusActive && currentMatch?.id === matchId;
     const homeName = sourceLabel(matchId, "home");
     const awayName = sourceLabel(matchId, "away");
     const placement = bracketRows.get(matchId);
     return (
       <button
         type="button"
-        className={`${compact ? "bracket-card compact" : "bracket-card"} ${revealed ? "revealed" : ""}`}
+        className={`${compact ? "bracket-card compact" : "bracket-card"} ${revealed ? "revealed" : ""} ${isCurrent ? "current-reveal" : ""}`}
         style={placement ? { gridRow: `${placement.row} / span ${placement.span}` } : undefined}
         onClick={() => openKnockoutMatch(matchId)}
         disabled={!available}
@@ -1212,13 +1214,15 @@ export default function Home() {
     const match = matchById.get(matchId)?.match;
     const available = isKnockoutMatchAvailable(matchId);
     const revealed = revealedMatchIds.has(matchId);
+    const isFocusActive = flow === "full" && phase === "knockout" && ["loading", "winner", "championDecision"].includes(autoKnockoutStatus);
+    const isCurrent = isFocusActive && currentMatch?.id === matchId;
     const homeName = available && match ? match.home : "";
     const awayName = available && match ? match.away : "";
 
     return (
       <button
         type="button"
-        className={`mobile-match-card ${revealed ? "revealed" : ""}`}
+        className={`mobile-match-card ${revealed ? "revealed" : ""} ${isCurrent ? "current-reveal" : ""}`}
         onClick={() => openKnockoutMatch(matchId)}
         disabled={!available}
         aria-label={available ? `${tr(t.matchNumber, { number: String(matchId) })}: ${homeName} ${t.versus} ${awayName}` : `${tr(t.matchNumber, { number: String(matchId) })} ${t.locked}`}
@@ -1523,22 +1527,17 @@ export default function Home() {
       )}
 
       {phase === "knockout" && (
-        <section className="bracket-page">
-          <div className="bracket-toolbar">
-            <p className="kicker">{t.aiMode}</p>
-            <h2>{t.knockoutBracket}</h2>
-            <p className="step">{t.tapAnyLiveMatch}</p>
-            <p className="bracket-help">{t.swipeToExplore}</p>
-            {flow === "full" && autoRunning && (
-              <button className="secondary compact-action" onClick={() => setAutoPaused((current) => !current)}>
-                {autoPaused ? t.resumePrediction : t.pausePrediction}
-              </button>
-            )}
-          </div>
+        <section className={`bracket-page ${flow === "full" && ["loading", "winner", "championDecision"].includes(autoKnockoutStatus) ? "reveal-focus" : ""}`}>
+          {flow === "full" && autoRunning && (
+            <button className="simulation-pause-button" onClick={() => setAutoPaused((current) => !current)}>
+              {autoPaused ? t.resumePrediction : t.pausePrediction}
+            </button>
+          )}
           <BracketViewport mobile={<MobileKnockoutTree />}>
             <BracketBranch side="left" />
             <div className="bracket-center">
               <h3>{t.final}</h3>
+              {flow === "full" && roundSetMessage && <div className="bracket-round-status">{roundSetMessage}</div>}
               <div className="center-logo-wrap">
                 <img src="/worldcup-2026-logo.png" alt={t.logoAlt} />
                 <span>{t.trophyPath}</span>
@@ -1549,39 +1548,6 @@ export default function Home() {
             </div>
             <BracketBranch side="right" />
           </BracketViewport>
-          {flow === "full" && autoRunning && currentMatch && (
-            <div className={autoKnockoutStatus === "winner" || autoKnockoutStatus === "championDecision" ? "auto-match-overlay winner" : "auto-match-overlay"}>
-              {autoKnockoutStatus === "championDecision" ? (
-                <>
-                  <Trophy size={42} />
-                  <strong>{t.championDecision}</strong>
-                  <i />
-                </>
-              ) : autoKnockoutStatus === "winner" ? (
-                <>
-                  <Trophy size={36} />
-                  <strong>{t.winner}</strong>
-                  {flag(currentMatch.winner, "large")}
-                  <h2>{currentMatch.winner}</h2>
-                </>
-              ) : autoKnockoutStatus === "overview" && roundSetMessage ? (
-                <>
-                  <Trophy size={34} />
-                  <strong>{roundSetMessage}</strong>
-                  <p>{t.fullKnockoutPath}</p>
-                </>
-              ) : (
-                <>
-                  <span>{tr(t.matchNumber, { number: String(currentMatch.id) })}</span>
-                  <div>{flag(currentMatch.home)}<b>{currentMatch.home}</b></div>
-                  <em>{t.versus}</em>
-                  <div>{flag(currentMatch.away)}<b>{currentMatch.away}</b></div>
-                  <p>{autoPaused ? t.paused : autoKnockoutStatus === "loading" ? t.predicting : t.runningPrediction}</p>
-                  {autoKnockoutStatus === "loading" && <i />}
-                </>
-              )}
-            </div>
-          )}
         </section>
       )}
 
