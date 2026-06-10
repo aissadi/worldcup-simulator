@@ -1853,7 +1853,13 @@ export default function Home() {
 
       {phase === "champion" && (
         <section className="screen champion-screen final-champion-screen">
-          <div className="trophy-glow"><Trophy size={88} /></div>
+          <p className="kicker final-kicker">{t.worldCupFinal}</p>
+          <div className="champion-trophy-showcase" aria-label={t.logoAlt}>
+            <i />
+            <i />
+            <i />
+            <img src="/worldcup-2026-logo.png" alt={t.logoAlt} />
+          </div>
           <p className="kicker">{t.worldCupChampion}</p>
           <div className="champion-card-expanded">
             <strong>{t.worldCupChampion}</strong>

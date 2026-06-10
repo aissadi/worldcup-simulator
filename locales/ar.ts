@@ -136,6 +136,7 @@ const ar = {
   nextMatch: "المباراة التالية",
   revealChampion: "كشف البطل",
   championDecision: "🏆 قرار البطل",
+  worldCupFinal: "نهائي كأس العالم",
   worldCupChampion: "بطل كأس العالم 2026",
   newSimulation: "محاكاة جديدة",
   advance: "تأهل",

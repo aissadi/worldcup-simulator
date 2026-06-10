@@ -136,6 +136,7 @@ const es = {
   nextMatch: "Siguiente Partido",
   revealChampion: "Revelar Campeón",
   championDecision: "🏆 DECISIÓN DEL CAMPEÓN",
+  worldCupFinal: "FINAL DEL MUNDIAL",
   worldCupChampion: "CAMPEÓN DEL MUNDIAL 2026",
   newSimulation: "Nueva Simulación",
   advance: "avanza",

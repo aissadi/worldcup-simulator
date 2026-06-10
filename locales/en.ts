@@ -136,6 +136,7 @@ const en = {
   nextMatch: "Next Match",
   revealChampion: "Reveal Champion",
   championDecision: "🏆 CHAMPION DECISION",
+  worldCupFinal: "WORLD CUP FINAL",
   worldCupChampion: "WORLD CUP 2026 CHAMPION",
   newSimulation: "New Simulation",
   advance: "advance",
