@@ -462,6 +462,7 @@ export default function Home() {
   const [builderThirdGroups, setBuilderThirdGroups] = useState<string[]>([]);
   const [manualWinners, setManualWinners] = useState<Record<number, string>>({});
   const [builderWarning, setBuilderWarning] = useState("");
+  const [matchTeamFilter, setMatchTeamFilter] = useState("");
   const [bracketZoom, setBracketZoom] = useState(1);
   const [bracketFitScale, setBracketFitScale] = useState(1);
   const [autoRunning, setAutoRunning] = useState(false);
@@ -477,6 +478,18 @@ export default function Home() {
 
   const result = useMemo(() => simulate(seed), [seed]);
   const groupPredictionMatches = useMemo(() => buildGroupPredictionMatches(seed), [seed]);
+  const favoriteTeams = ["Morocco", "Argentina", "Brazil", "France", "Spain"];
+  const featuredMatchIndex = useMemo(() => {
+    const featuredPool = groupPredictionMatches
+      .map((match, index) => ({ match, index }))
+      .filter(({ match }) => favoriteTeams.includes(match.home) || favoriteTeams.includes(match.away));
+    const pool = featuredPool.length ? featuredPool : groupPredictionMatches.map((match, index) => ({ match, index }));
+    return pool[Math.floor(rngFrom(seed + 2026)() * pool.length)]?.index ?? 0;
+  }, [groupPredictionMatches, seed]);
+  const featuredMatch = groupPredictionMatches[featuredMatchIndex];
+  const filteredPredictionMatches = matchTeamFilter
+    ? groupPredictionMatches.filter((match) => match.home === matchTeamFilter || match.away === matchTeamFilter)
+    : groupPredictionMatches;
   const t = locales[language];
   const isRtl = t.dir === "rtl";
   const currentGroupIndex = flow === "group" ? selectedGroupIndex : groupIndex;
@@ -743,6 +756,7 @@ export default function Home() {
     setCountdown(3);
     setHybridStage("intro");
     setHybridHomeProb(50);
+    if (nextFlow !== "singleMatch") setMatchTeamFilter("");
     if (nextFlow === "full") {
       setGroupIndex(0);
       setPhase("fullIntro");
@@ -758,6 +772,16 @@ export default function Home() {
       setBuilderWarning("");
       setPhase("builderGroup");
     }
+  }
+
+  function openTeamPredictions(team: string) {
+    setMatchTeamFilter(team);
+    openHomeCard("singleMatch");
+  }
+
+  function openFeaturedPrediction() {
+    setMatchTeamFilter("");
+    openPredictor(featuredMatchIndex, "singleMatch");
   }
 
   function startFullPrediction() {
@@ -1298,17 +1322,43 @@ export default function Home() {
 
       {phase === "home" && (
         <section className="screen landing">
-          <img className="landing-logo" src="/worldcup-2026-logo.png" alt={t.logoAlt} />
-          <div className="landing-graphic" aria-hidden="true"><Trophy size={74} /><span /></div>
+          <div className="landing-atmosphere" aria-hidden="true"><i /><i /><i /></div>
+          <div className="landing-trophy">
+            <img className="landing-logo" src="/worldcup-2026-logo.png" alt={t.logoAlt} />
+            <Trophy size={68} />
+          </div>
           <h1>{t.homeTitle}</h1>
           <p className="subtitle">{t.homeSubtitle}</p>
+          <button className="quick-predict" onClick={startFullPrediction}>
+            <Sparkles size={22} />
+            <span>{t.quickPredict}</span>
+          </button>
           <div className="home-grid">
-            <button className="home-card" onClick={() => openHomeCard("full")}><b>{t.startFullTournament}</b><span>{t.aiMode}</span></button>
-            <button className="home-card" onClick={() => openHomeCard("group")}><b>{t.chooseGroup}</b><span>{t.aiMode}</span></button>
-            <button className="home-card" onClick={() => openHomeCard("singleMatch")}><b>{t.predictOneMatch}</b><span>{t.aiMode}</span></button>
-            <button className="home-card" onClick={() => openHomeCard("knockout")}><b>{t.knockoutStagePredictions}</b><span>{t.aiMode}</span></button>
-            <button className="home-card" onClick={() => openHomeCard("manual")}><b>{t.buildYourPredictions}</b><span>{t.manualBuilderMode}</span></button>
+            <button className="home-card" onClick={() => openHomeCard("full")}><span>🌎</span><b>{t.fullTournamentCardTitle}</b><em>{t.fullTournamentCardText}</em></button>
+            <button className="home-card" onClick={() => openHomeCard("group")}><span>🏟</span><b>{t.groupsCardTitle}</b><em>{t.groupsCardText}</em></button>
+            <button className="home-card" onClick={() => { setMatchTeamFilter(""); openHomeCard("singleMatch"); }}><span>⚽</span><b>{t.oneMatchCardTitle}</b><em>{t.oneMatchCardText}</em></button>
+            <button className="home-card" onClick={() => openHomeCard("knockout")}><span>🏆</span><b>{t.knockoutsCardTitle}</b><em>{t.knockoutsCardText}</em></button>
+            <button className="home-card" onClick={() => openHomeCard("manual")}><span>✍</span><b>{t.buildBracketCardTitle}</b><em>{t.buildBracketCardText}</em></button>
           </div>
+          {featuredMatch && (
+            <section className="featured-prediction">
+              <p className="kicker">{t.featuredPrediction}</p>
+              <div className="featured-match">
+                <strong>{flag(featuredMatch.home)} {featuredMatch.home}</strong>
+                <span>{t.versus}</span>
+                <strong>{flag(featuredMatch.away)} {featuredMatch.away}</strong>
+              </div>
+              <button className="primary" onClick={openFeaturedPrediction}>{t.predictNow}</button>
+            </section>
+          )}
+          <section className="team-shortcuts">
+            <p className="kicker">{t.myTeamShortcuts}</p>
+            <div>
+              {favoriteTeams.map((team) => (
+                <button key={team} onClick={() => openTeamPredictions(team)}>{flag(team)} {team}</button>
+              ))}
+            </div>
+          </section>
         </section>
       )}
 
@@ -1438,14 +1488,17 @@ export default function Home() {
           <h2>{t.matchPredictor}</h2>
           <p className="step">{t.groupStageMatchesOnly}</p>
           <div className="match-list">
-            {groupPredictionMatches.map((match, index) => (
+            {matchTeamFilter && <p className="team-filter">{flag(matchTeamFilter)} {tr(t.predictionsInvolving, { team: matchTeamFilter })}</p>}
+            {filteredPredictionMatches.map((match) => {
+              const index = groupPredictionMatches.findIndex((item) => item.id === match.id);
+              return (
               <button className="mini-match" key={match.id} onClick={() => openPredictor(index, "singleMatch")}>
                 <span>{tr(t.groupMatchNumber, { group: match.homeSource[0], number: match.homeSource.slice(1) })}</span>
                 <b>{flag(match.home)} {match.home}</b>
                 <em>{t.versus}</em>
                 <b>{flag(match.away)} {match.away}</b>
               </button>
-            ))}
+            );})}
           </div>
         </section>
       )}
@@ -1524,7 +1577,8 @@ export default function Home() {
                 <h2>{currentMatch.winner}</h2>
                 {predictionReady && (
                   <div className="hybrid-actions">
-                    <button className="primary" onClick={shareWinner}><Share2 size={18} /> {t.sharePrediction}</button>
+                    <button className="primary" onClick={shareWinner}><Share2 size={18} /> {t.shareVideo}</button>
+                    <button className="primary" onClick={shareWinner}><Share2 size={18} /> {t.shareResult}</button>
                     <button className="secondary" onClick={predictAnotherMatch}>{t.predictAnotherMatch}</button>
                     <button className="secondary" onClick={goHome}><House size={18} /> {t.home}</button>
                   </div>
