@@ -1467,12 +1467,6 @@ export default function Home() {
 
       {phase === "builderBracket" && (
         <section className="bracket-page">
-          <div className="bracket-toolbar">
-            <p className="kicker">{t.manualBuilderMode}</p>
-            <h2>{t.buildYourPredictions}</h2>
-            <p className="step">{t.tapWinner}</p>
-            <p className="bracket-help">{t.swipeToExplore}</p>
-          </div>
           <BracketViewport mobile={<MobileKnockoutTree manual />}>
             <ManualBranch side="left" />
             <div className="bracket-center">
@@ -1530,7 +1524,7 @@ export default function Home() {
         <section className={`bracket-page ${flow === "full" && ["loading", "winner", "championDecision"].includes(autoKnockoutStatus) ? "reveal-focus" : ""}`}>
           {flow === "full" && autoRunning && (
             <button className="simulation-pause-button" onClick={() => setAutoPaused((current) => !current)}>
-              {autoPaused ? t.resumePrediction : t.pausePrediction}
+              {autoPaused ? `▶ ${t.resumePrediction}` : `⏸ ${t.pausePrediction}`}
             </button>
           )}
           <BracketViewport mobile={<MobileKnockoutTree />}>

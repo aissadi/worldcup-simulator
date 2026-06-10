@@ -1038,6 +1038,7 @@ h2 {
 }
 
 .auto-match-overlay {
+  display: none;
   position: absolute;
   left: 12px;
   right: 12px;
@@ -1342,7 +1343,7 @@ h2 {
 
 .bracket-card.revealed .bracket-team {
   filter: grayscale(1);
-  opacity: 0.35;
+  opacity: 0.5;
 }
 
 .bracket-card.revealed .bracket-team.winner {
@@ -2534,7 +2535,7 @@ h2 {
 
   .mobile-match-card.revealed .mobile-flag-row.loser {
     filter: grayscale(1);
-    opacity: 0.35;
+    opacity: 0.5;
   }
 
   .mobile-match-card.revealed .mobile-flag-row.winner {
