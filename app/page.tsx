@@ -4,7 +4,7 @@ import { ChevronLeft, House, Share2, Sparkles, Trophy, Volume2, Zap } from "luci
 import { type CSSProperties, type ReactNode, type TouchEvent, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { languageOptions, locales, type LocaleCode } from "../locales";
 
-type Phase = "home" | "fullIntro" | "tournamentGroup" | "groupSelect" | "groupReveal" | "bestThirds" | "matchSelect" | "predictor" | "knockout" | "roundSet" | "champion" | "builderGroup" | "builderThirds" | "builderBracket";
+type Phase = "home" | "fullIntro" | "tournamentGroup" | "groupSelect" | "groupReveal" | "bestThirds" | "matchSelect" | "predictor" | "knockout" | "roundSet" | "championDecision" | "champion" | "builderGroup" | "builderThirds" | "builderBracket";
 type Team = { name: string; rating: number; group: string; flag: string; code?: string };
 type Group = { id: string; teams: Team[] };
 type Standing = Team & { played: number; won: number; drawn: number; lost: number; gf: number; ga: number; gd: number; points: number };
@@ -18,7 +18,7 @@ type LocaleText = (typeof locales)[LocaleCode];
 type BuilderPick = { first?: string; second?: string; third?: string };
 type ManualMatch = { id: number; home?: string; away?: string; homeSource: string; awaySource: string; winner?: string; label: string; ready: boolean };
 
-const BRACKET_CANVAS_WIDTH = 1800;
+const BRACKET_CANVAS_WIDTH = 3000;
 const BRACKET_CANVAS_HEIGHT = 1540;
 
 const flagEmoji: Record<string, string> = {
@@ -468,7 +468,7 @@ export default function Home() {
   const [autoRunning, setAutoRunning] = useState(false);
   const [autoPaused, setAutoPaused] = useState(false);
   const [autoThirdRevealCount, setAutoThirdRevealCount] = useState(0);
-  const [autoKnockoutStatus, setAutoKnockoutStatus] = useState<"overview" | "idle" | "loading" | "winner">("idle");
+  const [autoKnockoutStatus, setAutoKnockoutStatus] = useState<"overview" | "idle" | "loading" | "winner" | "championDecision">("idle");
   const pinchDistanceRef = useRef<number | null>(null);
   const pinchZoomRef = useRef(1);
   const bracketScrollRef = useRef<HTMLDivElement | null>(null);
@@ -517,6 +517,15 @@ export default function Home() {
   useEffect(() => {
     pinchZoomRef.current = bracketZoom;
   }, [bracketZoom]);
+
+  useEffect(() => {
+    if (phase !== "championDecision") return;
+    const timer = window.setTimeout(() => {
+      playWhoosh();
+      setPhase("champion");
+    }, 2200);
+    return () => window.clearTimeout(timer);
+  }, [phase]);
 
   useLayoutEffect(() => {
     if (phase !== "knockout" && phase !== "builderBracket") return;
@@ -593,7 +602,10 @@ export default function Home() {
       if (!match) return;
       if (autoKnockoutStatus === "overview") {
         scheduleAutoTimer(() => showBracketOverview(), 150);
-        scheduleAutoTimer(() => setAutoKnockoutStatus("idle"), 2600);
+        scheduleAutoTimer(() => {
+          setRoundSetMessage("");
+          setAutoKnockoutStatus("idle");
+        }, roundSetMessage ? 2200 : 2600);
       }
       if (autoKnockoutStatus === "idle" && isKnockoutMatchAvailable(match.id)) {
         scheduleAutoTimer(() => {
@@ -604,28 +616,33 @@ export default function Home() {
       }
       if (autoKnockoutStatus === "loading") {
         scheduleAutoTimer(() => {
-          setRevealedMatchIds((previous) => new Set(previous).add(match.id));
-          setAutoKnockoutStatus("winner");
+          if (match.id !== 104) {
+            setRevealedMatchIds((previous) => new Set(previous).add(match.id));
+          }
+          setAutoKnockoutStatus(match.id === 104 ? "championDecision" : "winner");
           playWhoosh();
         }, 4600);
       }
+      if (autoKnockoutStatus === "championDecision") {
+        scheduleAutoTimer(() => {
+          setAutoRunning(false);
+          setPhase("champion");
+        }, 2200);
+      }
       if (autoKnockoutStatus === "winner") {
         scheduleAutoTimer(() => {
-          if (match.id === 104) {
-            setAutoRunning(false);
-            setPhase("champion");
-            return;
-          }
           const nextIndex = matchIndex + 1;
           const nextMatch = knockoutMatches[nextIndex];
+          const messageKey = nextRoundSetKey(match.id);
+          if (messageKey) setRoundSetMessage(t[messageKey]);
           setMatchIndex(nextIndex);
           setAutoKnockoutStatus(nextMatch && roundKey(nextMatch.id) !== roundKey(match.id) ? "overview" : "idle");
-        }, 1500);
+        }, 1800);
       }
     }
 
     return () => clearAutoTimers();
-  }, [phase, flow, autoRunning, autoPaused, groupLoading, groupRevealed, groupIndex, autoThirdRevealCount, autoKnockoutStatus, matchIndex, result.bestThirds.length, revealedMatchIds]);
+  }, [phase, flow, autoRunning, autoPaused, groupLoading, groupRevealed, groupIndex, autoThirdRevealCount, autoKnockoutStatus, matchIndex, result.bestThirds.length, revealedMatchIds, roundSetMessage, t]);
 
   function tr(template: string, values: Record<string, string>) {
     return Object.entries(values).reduce((text, [key, value]) => text.replaceAll(`{${key}}`, value), template);
@@ -973,11 +990,11 @@ export default function Home() {
     if (flow === "knockout") {
       setRevealedMatchIds((previous) => new Set(previous).add(currentMatch.id));
       setMatchRevealed(true);
-    setPredictionReady(false);
-    setPredictionLoading(false);
-    setPredictionMessage("");
-    clearPredictorTimers();
-    setPhase(currentMatch.id === 104 ? "champion" : "knockout");
+      setPredictionReady(false);
+      setPredictionLoading(false);
+      setPredictionMessage("");
+      clearPredictorTimers();
+      setPhase(currentMatch.id === 104 ? "championDecision" : "knockout");
       return;
     }
     openPredictor(Math.min(matchIndex + 1, groupPredictionMatches.length - 1), "singleMatch");
@@ -1124,6 +1141,7 @@ export default function Home() {
         </div>
         {!available && <small>{t.locked}</small>}
         {revealed && <small>{t.winner}: {match.winner}</small>}
+        {revealed && <span className="advance-chip">{flag(match.winner)} {t.advance}</span>}
       </button>
     );
   }
@@ -1170,6 +1188,7 @@ export default function Home() {
           );
         })}
         <small>{winner ? `${t.winner}: ${winner}` : match.ready ? t.tapWinner : t.locked}</small>
+        {winner && <span className="advance-chip">{flag(winner)} {t.advance}</span>}
       </div>
     );
   }
@@ -1531,13 +1550,25 @@ export default function Home() {
             <BracketBranch side="right" />
           </BracketViewport>
           {flow === "full" && autoRunning && currentMatch && (
-            <div className={autoKnockoutStatus === "winner" ? "auto-match-overlay winner" : "auto-match-overlay"}>
-              {autoKnockoutStatus === "winner" ? (
+            <div className={autoKnockoutStatus === "winner" || autoKnockoutStatus === "championDecision" ? "auto-match-overlay winner" : "auto-match-overlay"}>
+              {autoKnockoutStatus === "championDecision" ? (
+                <>
+                  <Trophy size={42} />
+                  <strong>{t.championDecision}</strong>
+                  <i />
+                </>
+              ) : autoKnockoutStatus === "winner" ? (
                 <>
                   <Trophy size={36} />
                   <strong>{t.winner}</strong>
                   {flag(currentMatch.winner, "large")}
                   <h2>{currentMatch.winner}</h2>
+                </>
+              ) : autoKnockoutStatus === "overview" && roundSetMessage ? (
+                <>
+                  <Trophy size={34} />
+                  <strong>{roundSetMessage}</strong>
+                  <p>{t.fullKnockoutPath}</p>
                 </>
               ) : (
                 <>
@@ -1655,12 +1686,25 @@ export default function Home() {
         </section>
       )}
 
-      {phase === "champion" && (
-        <section className="screen champion-screen">
+      {phase === "championDecision" && (
+        <section className="screen champion-decision-screen">
           <div className="trophy-glow"><Trophy size={88} /></div>
-          <h2>{flag(displayChampion, "large")} {tr(t.championLine, { team: displayChampion })}</h2>
+          <p className="kicker">{t.championDecision}</p>
+          <h2>{t.finalAiDecisionLoading}</h2>
+        </section>
+      )}
+
+      {phase === "champion" && (
+        <section className="screen champion-screen final-champion-screen">
+          <div className="trophy-glow"><Trophy size={88} /></div>
+          <p className="kicker">{t.worldCupChampion}</p>
+          <div className="champion-card-expanded">
+            <strong>{t.worldCupChampion}</strong>
+            {flag(displayChampion, "huge")}
+            <h2>{displayChampion}</h2>
+          </div>
           <button className="primary" onClick={shareResult}><Share2 size={18} /> {t.shareResult}</button>
-          <button className="secondary" onClick={runAgain}><Sparkles size={18} /> {t.runAgain}</button>
+          <button className="secondary" onClick={runAgain}><Sparkles size={18} /> {t.newSimulation}</button>
           <button className="secondary" onClick={goHome}><House size={18} /> {t.home}</button>
           {copied && <p className="copied">{t.copied}</p>}
         </section>
