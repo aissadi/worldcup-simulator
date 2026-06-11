@@ -1855,31 +1855,28 @@ export default function Home() {
         <section className="screen champion-screen final-champion-screen">
           <p className="kicker final-kicker">{t.worldCupFinal}</p>
           <div
-            className="champion-trophy-showcase"
+            className="champion-logo-only"
             aria-label={t.logoAlt}
             style={{
-              width: "min(92vw, 392px)",
-              height: "min(92vw, 392px)",
-              margin: "-4px auto -8px",
-              background: "radial-gradient(circle, rgba(248, 200, 78, 0.28), rgba(248, 200, 78, 0.1) 46%, transparent 72%)",
-              borderRadius: "999px",
-              boxShadow: "0 0 72px rgba(248, 200, 78, 0.28)",
+              width: "min(34vw, 120px)",
+              height: "min(34vw, 120px)",
+              margin: "0 auto 4px",
+              background: "transparent",
+              borderRadius: 0,
+              boxShadow: "0 0 46px rgba(248, 200, 78, 0.38)",
               display: "grid",
               placeItems: "center"
             }}
           >
-            <i />
-            <i />
-            <i />
             <img
               src="/worldcup-2026-logo.png"
               alt={t.logoAlt}
               style={{
-                height: "min(86vw, 325px)",
-                width: "auto",
+                width: "min(34vw, 120px)",
+                height: "auto",
                 maxWidth: "100%",
                 objectFit: "contain",
-                filter: "drop-shadow(0 0 34px rgba(248, 200, 78, 0.62)) drop-shadow(0 22px 48px rgba(0, 0, 0, 0.48))"
+                filter: "drop-shadow(0 0 26px rgba(248, 200, 78, 0.58)) drop-shadow(0 14px 30px rgba(0, 0, 0, 0.42))"
               }}
             />
           </div>
