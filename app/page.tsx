@@ -1458,24 +1458,29 @@ export default function Home() {
       {phase === "champion" && <div className="confetti" aria-hidden="true"><i /><i /><i /><i /><i /><i /><i /><i /></div>}
 
       {phase === "home" && (
-        <section className="screen landing">
+        <section className="screen landing" style={{ alignItems: "center", textAlign: "center" }}>
           <div className="landing-atmosphere" aria-hidden="true"><i /><i /><i /></div>
-          <div className="landing-trophy">
+          <div className="landing-trophy" style={{ marginLeft: "auto", marginRight: "auto" }}>
             <img className="landing-logo" src="/worldcup-2026-logo.png" alt={t.logoAlt} />
             <Trophy size={68} />
           </div>
-          <h1><span>{t.homeTitleLine1}</span><span>{t.homeTitleLine2}</span><span>{t.homeTitleLine3}</span></h1>
-          <p className="subtitle">{t.homeSubtitle}</p>
-          <button className="quick-predict" onClick={startFullPrediction}>
+          <h1 style={{ textAlign: "center" }}><span>WORLD CUP 2026</span><span>PREDICTIONS</span></h1>
+          <p className="subtitle" style={{ marginLeft: "auto", marginRight: "auto", textAlign: "center" }}>
+            Predict matches,<br />
+            reveal groups,<br />
+            simulate the knockout stage,<br />
+            and crown a champion.
+          </p>
+          <button className="quick-predict" onClick={startFullPrediction} style={{ alignSelf: "center" }}>
             <Sparkles size={22} />
             <span>{t.quickPredict}</span>
           </button>
           <div className="home-grid">
-            <button className="home-card" onClick={() => openHomeCard("full")}><span>🌎</span><b>{t.fullTournamentCardTitle}</b><em>{t.fullTournamentCardText}</em></button>
-            <button className="home-card" onClick={() => openHomeCard("group")}><span>🏟</span><b>{t.groupsCardTitle}</b><em>{t.groupsCardText}</em></button>
-            <button className="home-card" onClick={() => { setMatchTeamFilter(""); openHomeCard("singleMatch"); }}><span>⚽</span><b>{t.oneMatchCardTitle}</b><em>{t.oneMatchCardText}</em></button>
-            <button className="home-card" onClick={() => openHomeCard("knockout")}><span>🏆</span><b>{t.knockoutsCardTitle}</b><em>{t.knockoutsCardText}</em></button>
-            <button className="home-card" onClick={() => openHomeCard("manual")}><span>✍</span><b>{t.buildBracketCardTitle}</b><em>{t.buildBracketCardText}</em></button>
+            <button className="home-card" onClick={() => openHomeCard("full")}><span>🌎</span><b>Full Tournament Journey</b><em>{t.fullTournamentCardText}</em></button>
+            <button className="home-card" onClick={() => openHomeCard("group")}><span>🏟</span><b>Group Stage Reveal</b><em>{t.groupsCardText}</em></button>
+            <button className="home-card" onClick={() => { setMatchTeamFilter(""); openHomeCard("singleMatch"); }}><span>⚽</span><b>Match Predictor</b><em>{t.oneMatchCardText}</em></button>
+            <button className="home-card" onClick={() => openHomeCard("knockout")}><span>🏆</span><b>Road To The Trophy</b><em>{t.knockoutsCardText}</em></button>
+            <button className="home-card" onClick={() => openHomeCard("manual")}><span>✍</span><b>Build Your Champion</b><em>{t.buildBracketCardText}</em></button>
           </div>
           {featuredMatch && (
             <section className="featured-prediction">
