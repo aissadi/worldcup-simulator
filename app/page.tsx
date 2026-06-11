@@ -1232,36 +1232,42 @@ export default function Home() {
     const awayName = sourceLabel(matchId, "away");
     const followsSelectedTeam = Boolean(selectedTeam && [homeName, awayName, match.winner].includes(selectedTeam));
     const placement = bracketRows.get(matchId);
+    const homeState = revealed ? match.winner === homeName ? "winner" : "loser" : "";
+    const awayState = revealed ? match.winner === awayName ? "winner" : "loser" : "";
     return (
       <button
         type="button"
-        className={`${compact ? "bracket-card compact" : "bracket-card"} ${revealed ? "revealed" : ""} ${isCurrent ? "current-reveal" : ""} ${followsSelectedTeam ? "team-path" : ""}`}
+        className={`${compact ? "bracket-card compact" : "bracket-card"} ${revealed ? "revealed" : ""} ${isCurrent ? "current-reveal" : ""} ${followsSelectedTeam ? "team-path" : ""} ${available ? "" : "locked"}`}
         style={placement ? { gridRow: `${placement.row} / span ${placement.span}` } : undefined}
         onClick={() => openKnockoutMatch(matchId)}
         disabled={!available}
       >
         <span>{tr(t.matchNumber, { number: String(match.id) })}</span>
-        <div className={revealed && match.winner === match.home ? "bracket-team winner" : "bracket-team"}>
+        <div className={`bracket-team ${homeState}`}>
           {available ? flag(homeName) : <i />}
           <strong>{homeName}</strong>
         </div>
         <em>{t.versus}</em>
-        <div className={revealed && match.winner === match.away ? "bracket-team winner" : "bracket-team"}>
+        <div className={`bracket-team ${awayState}`}>
           {available ? flag(awayName) : <i />}
           <strong>{awayName}</strong>
         </div>
         {!available && <small>{t.locked}</small>}
-        {revealed && <small>{t.winner}: {match.winner}</small>}
-        {revealed && <span className="advance-chip">{flag(match.winner)} {t.advance}</span>}
       </button>
     );
   }
 
   function BracketBranch({ side }: { side: "left" | "right" }) {
+    const focusedRound = flow === "full" && phase === "knockout" && autoKnockoutStatus === "loading" && currentMatch
+      ? roundKey(currentMatch.id)
+      : null;
     return (
       <div className={`bracket-branch ${side}`}>
         {bracketLayout[side].map((column, index) => (
-          <div className="bracket-stage-column" key={`${side}-${index}`}>
+          <div
+            className={`bracket-stage-column ${focusedRound === stageKeys[index] ? "stage-focus" : focusedRound ? "stage-dim" : ""}`}
+            key={`${side}-${index}`}
+          >
             <h3>{t[stageKeys[index]]}</h3>
             <div className="bracket-column">
               {column.map((matchId) => <BracketCard key={matchId} matchId={matchId} compact={index > 1} />)}
@@ -1332,7 +1338,7 @@ export default function Home() {
     return (
       <button
         type="button"
-        className={`mobile-match-card ${revealed ? "revealed" : ""} ${isCurrent ? "current-reveal" : ""} ${followsSelectedTeam ? "team-path" : ""}`}
+        className={`mobile-match-card ${revealed ? "revealed" : ""} ${isCurrent ? "current-reveal" : ""} ${followsSelectedTeam ? "team-path" : ""} ${available ? "" : "locked"}`}
         onClick={() => openKnockoutMatch(matchId)}
         disabled={!available}
         aria-label={available ? `${tr(t.matchNumber, { number: String(matchId) })}: ${homeName} ${t.versus} ${awayName}` : `${tr(t.matchNumber, { number: String(matchId) })} ${t.locked}`}
@@ -1379,10 +1385,13 @@ export default function Home() {
   }
 
   function MobileKnockoutTree({ manual = false }: { manual?: boolean }) {
+    const focusedRound = flow === "full" && phase === "knockout" && autoKnockoutStatus === "loading" && currentMatch
+      ? roundKey(currentMatch.id)
+      : null;
     return (
       <div className="mobile-bracket-tree">
         {mobileBracketStages.map((stage) => (
-          <section className="mobile-bracket-stage" key={stage.key}>
+          <section className={`mobile-bracket-stage ${focusedRound === stage.key ? "stage-focus" : focusedRound ? "stage-dim" : ""}`} key={stage.key}>
             <h3>{t[stage.key]}</h3>
             <div className="mobile-stage-grid" style={{ "--match-count": stage.ids.length } as CSSProperties}>
               {stage.ids.map((matchId) => manual ? (
@@ -1398,12 +1407,22 @@ export default function Home() {
   }
 
   function BracketViewport({ children, mobile }: { children: ReactNode; mobile: ReactNode }) {
-    const scale = bracketFitScale * bracketZoom;
+    void mobile;
+    const scale = bracketFitScale * bracketZoom * 0.92;
+    const focusedRound = flow === "full" && phase === "knockout" && autoKnockoutStatus === "loading" && currentMatch
+      ? roundKey(currentMatch.id)
+      : "overview";
+    const finalFocus = focusedRound === "final" || focusedRound === "thirdPlaceMatch";
     return (
-      <div className="bracket-viewport" ref={(node) => { bracketScrollRef.current = node; bracketViewportRef.current = node; }}>
-        {mobile}
+      <div
+        className={`bracket-viewport focus-${focusedRound}`}
+        ref={(node) => { bracketScrollRef.current = node; bracketViewportRef.current = node; }}
+        onTouchStart={startBracketTouch}
+        onTouchMove={moveBracketTouch}
+        onTouchEnd={endBracketTouch}
+      >
         <div className="bracket-canvas" style={{ width: `${BRACKET_CANVAS_WIDTH * scale}px`, height: `${BRACKET_CANVAS_HEIGHT * scale}px` }}>
-          <div className="bracket-stage" style={{ transform: `scale(${scale})` }}>
+          <div className={`bracket-stage ${finalFocus ? "final-focus" : ""}`} style={{ transform: `scale(${scale})` }}>
             {children}
           </div>
         </div>

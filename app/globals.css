@@ -1085,10 +1085,11 @@ h2 {
   height: calc(100dvh - var(--header-height));
   display: flex;
   justify-content: center;
-  align-items: flex-start;
-  overflow: hidden;
-  touch-action: manipulation;
-  padding: 0;
+  align-items: center;
+  overflow: auto;
+  touch-action: pan-x pan-y pinch-zoom;
+  -webkit-overflow-scrolling: touch;
+  padding: 56px 8px 10px;
 }
 
 .bracket-canvas {
@@ -1113,6 +1114,7 @@ h2 {
   gap: 72px;
   padding: 34px 36px 18px;
   transform-origin: top center;
+  transition: transform 0.8s cubic-bezier(.2,.8,.2,1), filter 0.45s ease;
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 28px;
   background:
@@ -1397,6 +1399,12 @@ h2 {
   opacity: 0.56;
 }
 
+.bracket-card.locked,
+.mobile-match-card.locked {
+  opacity: 0.58;
+  filter: saturate(0.75);
+}
+
 .bracket-card.revealed {
   border-color: var(--gold);
   box-shadow: 0 0 38px rgba(248, 200, 78, 0.32), 0 0 22px rgba(34, 229, 140, 0.12), 24px 0 0 -21px rgba(248, 200, 78, 0.95);
@@ -1414,6 +1422,39 @@ h2 {
   background: linear-gradient(90deg, #fff6ba, var(--gold), var(--green));
   box-shadow: 0 0 24px rgba(248, 200, 78, 0.88), 0 0 18px rgba(34, 229, 140, 0.58);
   animation: connectorLight 0.7s ease-out both;
+}
+
+.bracket-stage-column {
+  transition: opacity 0.45s ease, filter 0.45s ease, transform 0.45s ease;
+}
+
+.bracket-stage-column.stage-dim,
+.mobile-bracket-stage.stage-dim {
+  opacity: 0.55;
+  filter: saturate(0.72);
+}
+
+.bracket-stage-column.stage-focus,
+.mobile-bracket-stage.stage-focus {
+  opacity: 1;
+  filter: brightness(1.14);
+  transform: scale(1.018);
+}
+
+.bracket-stage-column.stage-focus h3,
+.mobile-bracket-stage.stage-focus h3 {
+  color: #fff6ba;
+  text-shadow: 0 0 22px rgba(248, 200, 78, 0.68);
+}
+
+.bracket-stage.final-focus .bracket-branch {
+  opacity: 0.58;
+  filter: saturate(0.78);
+}
+
+.bracket-stage.final-focus .bracket-center {
+  transform: scale(1.035);
+  filter: brightness(1.14);
 }
 
 .bracket-card.compact { height: 118px; }
@@ -1523,7 +1564,8 @@ h2 {
   color: var(--gold);
 }
 
-.bracket-card.revealed .bracket-team {
+.bracket-card.revealed .bracket-team,
+.bracket-card.revealed .bracket-team.loser {
   filter: grayscale(1);
   opacity: 0.5;
 }
@@ -1551,8 +1593,8 @@ h2 {
 }
 
 .bracket-round-status {
-  min-height: 48px;
-  display: grid;
+  min-height: 0;
+  display: none;
   place-items: center;
   padding: 10px 14px;
   border: 1px solid rgba(248, 200, 78, 0.62);
@@ -2823,17 +2865,20 @@ h2 {
   }
 
   .bracket-viewport {
-    align-items: stretch;
-    justify-content: stretch;
-    overflow: hidden;
-    touch-action: manipulation;
+    align-items: center;
+    justify-content: center;
+    overflow: auto;
+    touch-action: pan-x pan-y pinch-zoom;
+    -webkit-overflow-scrolling: touch;
+    padding: 54px 6px 8px;
   }
 
   .bracket-canvas {
-    display: none;
+    display: block;
   }
 
   .mobile-bracket-tree {
+    display: none;
     width: 100vw;
     height: calc(100dvh - var(--header-height));
     min-height: calc(100dvh - var(--header-height));
