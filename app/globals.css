@@ -1083,13 +1083,17 @@ h2 {
 .bracket-viewport {
   width: 100vw;
   height: calc(100dvh - var(--header-height));
-  display: flex;
-  justify-content: center;
-  align-items: center;
+  display: block;
   overflow: auto;
   touch-action: pan-x pan-y pinch-zoom;
   -webkit-overflow-scrolling: touch;
   padding: 56px 8px 10px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.bracket-viewport::-webkit-scrollbar {
+  display: none;
 }
 
 .bracket-canvas {
@@ -1097,7 +1101,8 @@ h2 {
   width: 3000px;
   height: 1540px;
   flex: 0 0 auto;
-  transform-origin: top center;
+  margin: 0 auto;
+  transform-origin: top left;
 }
 
 .mobile-bracket-tree {
@@ -1113,7 +1118,7 @@ h2 {
   justify-content: center;
   gap: 72px;
   padding: 34px 36px 18px;
-  transform-origin: top center;
+  transform-origin: top left;
   transition: transform 0.8s cubic-bezier(.2,.8,.2,1), filter 0.45s ease;
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 28px;

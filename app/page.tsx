@@ -562,12 +562,7 @@ export default function Home() {
   useLayoutEffect(() => {
     if (phase !== "knockout" && phase !== "builderBracket") return;
     setBracketZoom(1);
-    window.requestAnimationFrame(() => {
-      const viewport = bracketScrollRef.current;
-      if (!viewport) return;
-      viewport.scrollLeft = 0;
-      viewport.scrollTop = 0;
-    });
+    centerBracketViewport();
   }, [phase]);
 
   useLayoutEffect(() => {
@@ -578,14 +573,18 @@ export default function Home() {
       if (!viewport) return;
       const bounds = viewport.getBoundingClientRect();
       const widthScale = bounds.width / BRACKET_CANVAS_WIDTH;
-      const heightScale = bounds.height / BRACKET_CANVAS_HEIGHT;
-      setBracketFitScale(Math.min(widthScale, heightScale, 1));
+      setBracketFitScale(Math.max(0.55, Math.min(widthScale, 1)));
     }
 
     updateBracketFit();
     window.addEventListener("resize", updateBracketFit);
     return () => window.removeEventListener("resize", updateBracketFit);
   }, [phase]);
+
+  useLayoutEffect(() => {
+    if (phase !== "knockout" && phase !== "builderBracket") return;
+    centerBracketViewport();
+  }, [phase, bracketFitScale]);
 
   useEffect(() => () => {
     clearAutoTimers();
@@ -710,32 +709,28 @@ export default function Home() {
 
   function resetBracketView() {
     setBracketZoom(1);
-    window.requestAnimationFrame(() => {
-      const viewport = bracketScrollRef.current;
-      if (!viewport) return;
-      viewport.scrollLeft = 0;
-      viewport.scrollTop = 0;
-    });
+    centerBracketViewport();
   }
 
   function showBracketOverview() {
     setBracketZoom(1);
-    window.requestAnimationFrame(() => {
-      const viewport = bracketScrollRef.current;
-      if (!viewport) return;
-      viewport.scrollLeft = 0;
-      viewport.scrollTop = 0;
-    });
+    centerBracketViewport();
   }
 
   function focusBracketRound(key: RoundKey) {
     void key;
     setBracketZoom(1);
+    centerBracketViewport();
+  }
+
+  function centerBracketViewport() {
     window.requestAnimationFrame(() => {
-      const viewport = bracketScrollRef.current;
-      if (!viewport) return;
-      viewport.scrollLeft = 0;
-      viewport.scrollTop = 0;
+      window.requestAnimationFrame(() => {
+        const viewport = bracketScrollRef.current;
+        if (!viewport) return;
+        viewport.scrollLeft = Math.max(0, (viewport.scrollWidth - viewport.clientWidth) / 2);
+        viewport.scrollTop = 0;
+      });
     });
   }
 
@@ -1419,7 +1414,7 @@ export default function Home() {
 
   function BracketViewport({ children, mobile }: { children: ReactNode; mobile: ReactNode }) {
     void mobile;
-    const scale = bracketFitScale * bracketZoom * 0.92;
+    const scale = bracketFitScale * bracketZoom;
     const focusedRound = flow === "full" && phase === "knockout" && autoKnockoutStatus === "loading" && currentMatch
       ? roundKey(currentMatch.id)
       : "overview";
