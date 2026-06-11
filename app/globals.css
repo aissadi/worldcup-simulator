@@ -1902,6 +1902,10 @@ h2 {
   filter: blur(16px) saturate(1.05) brightness(0.48);
 }
 
+.stage-intro .hybrid-versus .flag {
+  animation: introFlagZoom 2s ease-out both;
+}
+
 .hybrid-back {
   justify-self: flex-start;
 }
@@ -1955,11 +1959,21 @@ h2 {
 .hybrid-intro-card strong,
 .hybrid-versus strong {
   max-width: 100%;
-  overflow: hidden;
-  font-size: clamp(22px, 8vw, 42px);
-  line-height: 0.98;
+  overflow: visible;
+  font-size: clamp(24px, 7vw, 48px);
+  line-height: 1.02;
+  text-align: center;
   text-transform: uppercase;
-  text-overflow: ellipsis;
+  text-overflow: clip;
+  white-space: normal;
+  overflow-wrap: break-word;
+  text-wrap: balance;
+}
+
+.hybrid-intro-card strong.long-team-name,
+.hybrid-versus strong.long-team-name {
+  font-size: clamp(18px, 5vw, 34px);
+  line-height: 1.04;
 }
 
 .hybrid-intro-card > span,
@@ -2142,6 +2156,7 @@ h2 {
   border-radius: 999px;
   background: var(--gold);
   font-size: 18px;
+  animation: percentagePulse 0.9s ease-in-out infinite;
 }
 
 .lights-out {
@@ -2160,6 +2175,19 @@ h2 {
   animation: screenShake 0.16s linear infinite;
 }
 
+.stage-decision .hybrid-stadium {
+  filter: blur(18px) saturate(0.95) brightness(0.32);
+}
+
+.stage-meter .hybrid-stadium::after {
+  animation: stadiumLightBeams 0.75s ease-in-out infinite alternate, crowdShimmer 0.42s linear infinite;
+}
+
+.stage-meter .hybrid-versus > span,
+.stage-decision .hybrid-versus > span {
+  animation-duration: 0.62s;
+}
+
 .stage-decision .hybrid-versus div:first-child {
   animation: flagCenterLeft 10s ease-in-out forwards;
 }
@@ -2170,6 +2198,10 @@ h2 {
 
 .stage-freeze .hybrid-stadium {
   filter: blur(16px) saturate(0.72) brightness(0.38);
+}
+
+.stage-freeze {
+  filter: saturate(0.75) brightness(0.82);
 }
 
 .stage-freeze .hybrid-versus,
@@ -2232,8 +2264,8 @@ h2 {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background: radial-gradient(circle at 50% 38%, rgba(255, 246, 190, 0.56), rgba(248, 200, 78, 0.18) 20%, transparent 46%);
-  animation: goldFlash 1.2s ease-out both;
+  background: radial-gradient(circle at 50% 38%, rgba(255, 250, 214, 0.9), rgba(248, 200, 78, 0.38) 18%, transparent 48%);
+  animation: goldFlash 1.05s ease-out both;
 }
 
 .hybrid-winner > * {
@@ -2763,6 +2795,16 @@ h2 {
 @keyframes flagSlideRight {
   from { opacity: 0; transform: translateX(48px) scale(0.92); }
   to { opacity: 1; transform: translateX(0) scale(1); }
+}
+
+@keyframes introFlagZoom {
+  from { transform: scale(0.72); filter: brightness(0.8); }
+  to { transform: scale(1.08); filter: brightness(1.16); }
+}
+
+@keyframes percentagePulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 rgba(248, 200, 78, 0); }
+  50% { transform: scale(1.08); box-shadow: 0 0 20px rgba(248, 200, 78, 0.34); }
 }
 
 @keyframes flagCenterLeft {

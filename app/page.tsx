@@ -395,7 +395,7 @@ function playWhoosh() {
 }
 
 function playStadiumAmbience() {
-  [0, 1800, 3600, 5400, 7200, 9000, 12200, 15200, 18200, 21200, 24400, 28600, 32600, 35200].forEach((delay, index) => {
+  [0, 1800, 3600, 5400, 7200, 9000, 12200, 15200, 18200, 21200, 24400, 28600, 32600].forEach((delay, index) => {
     window.setTimeout(() => playTone(95 + (index % 4) * 22, 0.18, index % 2 ? "triangle" : "sawtooth"), delay);
   });
 }
@@ -957,7 +957,10 @@ export default function Home() {
       ? [50, 52, 49, 55, 61, 57, 63, 58, 62, 54, 60, 56, 64, 59, 66, 61, 68, 63, 70, 65, 72, 68, 74, 70, 76]
       : [50, 48, 51, 45, 39, 43, 37, 42, 38, 46, 40, 44, 36, 41, 34, 39, 32, 37, 30, 35, 28, 32, 26, 30, 24];
 
-    schedulePredictorTimer(() => setHybridStage("probability"), 3000);
+    schedulePredictorTimer(() => {
+      setHybridStage("probability");
+      playWhoosh();
+    }, 3000);
 
     battlePath.slice(0, 8).forEach((probability, index) => {
       schedulePredictorTimer(() => {
@@ -966,7 +969,10 @@ export default function Home() {
       }, 3000 + index * 1000);
     });
 
-    schedulePredictorTimer(() => setHybridStage("headToHead"), 10000);
+    schedulePredictorTimer(() => {
+      setHybridStage("headToHead");
+      playWhoosh();
+    }, 10000);
     [0, 1, 2, 3].forEach((cardIndex) => {
       schedulePredictorTimer(() => {
         setHybridCardIndex(cardIndex);
@@ -974,30 +980,35 @@ export default function Home() {
       }, 10000 + cardIndex * 2000);
     });
 
-    schedulePredictorTimer(() => setHybridStage("meter"), 18000);
-    battlePath.slice(8, 16).forEach((probability, index) => {
+    schedulePredictorTimer(() => {
+      setHybridStage("meter");
+      playWhoosh();
+    }, 18000);
+    battlePath.slice(8, 20).forEach((probability, index) => {
       schedulePredictorTimer(() => {
         setHybridHomeProb(probability);
         playDrumRoll();
-      }, 18000 + index * 900);
+      }, 18000 + index * 1000);
     });
 
-    schedulePredictorTimer(() => setHybridStage("decision"), 25000);
-    [25200, 26000, 26800, 27600, 28400, 29200, 30000, 31000, 32000, 33000, 34000].forEach((delay) => {
+    schedulePredictorTimer(() => {
+      setHybridStage("decision");
+      playWhoosh();
+    }, 30000);
+    [30200, 30800, 31400, 32000, 32600, 33200, 33800, 34400].forEach((delay) => {
       schedulePredictorTimer(() => playTone(86, 0.12, "square"), delay);
     });
-    battlePath.slice(16).forEach((probability, index) => {
-      schedulePredictorTimer(() => setHybridHomeProb(probability), 25000 + index * 650);
+    battlePath.slice(20).forEach((probability, index) => {
+      schedulePredictorTimer(() => setHybridHomeProb(probability), 30000 + index * 600);
     });
 
     schedulePredictorTimer(() => setHybridStage("freeze"), 35000);
-    schedulePredictorTimer(() => playTone(150, 0.03, "sine"), 36000);
     schedulePredictorTimer(() => {
       setHybridStage("winner");
       playWhoosh();
       playCrowdExplosion();
-    }, 40000);
-    schedulePredictorTimer(() => setHybridStage("engagement"), 43000);
+    }, 37000);
+    schedulePredictorTimer(() => setHybridStage("engagement"), 40000);
     schedulePredictorTimer(() => {
       setPredictionLoading(false);
       setPredictionReady(true);
@@ -1206,10 +1217,10 @@ export default function Home() {
     const homeHistory = 52 + ((homeRating + match.home.length) % 18);
     const awayHistory = 52 + ((awayRating + match.away.length) % 18);
     return [
-      { title: t.worldCupHistory, icon: "🏆", home: homeHistory, away: awayHistory },
-      { title: t.attackPower, icon: "⚽", home: ratingMetric(match.home, "attack"), away: ratingMetric(match.away, "attack") },
-      { title: t.defensePower, icon: "🛡", home: ratingMetric(match.home, "defense"), away: ratingMetric(match.away, "defense") },
-      { title: t.recentForm, icon: "🔥", home: ratingMetric(match.home, "form"), away: ratingMetric(match.away, "form") }
+      { title: "EXPERIENCE", icon: "🏆", home: homeHistory, away: awayHistory },
+      { title: "ATTACK", icon: "⚽", home: ratingMetric(match.home, "attack"), away: ratingMetric(match.away, "attack") },
+      { title: "DEFENSE", icon: "🛡", home: ratingMetric(match.home, "defense"), away: ratingMetric(match.away, "defense") },
+      { title: "FORM", icon: "🔥", home: ratingMetric(match.home, "form"), away: ratingMetric(match.away, "form") }
     ];
   }
 
@@ -1733,9 +1744,9 @@ export default function Home() {
             {(!predictionLoading && !predictionReady) ? (
               <>
                 <div className="hybrid-intro-card">
-                  <div>{flag(currentMatch.home, "huge")}<strong>{currentMatch.home}</strong></div>
+                  <div>{flag(currentMatch.home, "huge")}<strong className={currentMatch.home.length > 12 ? "long-team-name" : ""}>{currentMatch.home}</strong></div>
                   <span>{t.versus}</span>
-                  <div>{flag(currentMatch.away, "huge")}<strong>{currentMatch.away}</strong></div>
+                  <div>{flag(currentMatch.away, "huge")}<strong className={currentMatch.away.length > 12 ? "long-team-name" : ""}>{currentMatch.away}</strong></div>
                 </div>
                 <button className="primary hybrid-start" onClick={startPrediction}>{t.startPrediction}</button>
               </>
@@ -1763,13 +1774,13 @@ export default function Home() {
             ) : (
               <>
                 <div className="hybrid-versus">
-                  <div>{flag(currentMatch.home, "large")}<strong>{currentMatch.home}</strong>{["probability", "meter", "decision"].includes(hybridStage) && <b>{hybridHomeProb}%</b>}</div>
+                  <div>{flag(currentMatch.home, "large")}<strong className={currentMatch.home.length > 12 ? "long-team-name" : ""}>{currentMatch.home}</strong>{["probability", "meter", "decision"].includes(hybridStage) && <b>{hybridHomeProb}%</b>}</div>
                   <span>{t.versus}</span>
-                  <div>{flag(currentMatch.away, "large")}<strong>{currentMatch.away}</strong>{["probability", "meter", "decision"].includes(hybridStage) && <b>{100 - hybridHomeProb}%</b>}</div>
+                  <div>{flag(currentMatch.away, "large")}<strong className={currentMatch.away.length > 12 ? "long-team-name" : ""}>{currentMatch.away}</strong>{["probability", "meter", "decision"].includes(hybridStage) && <b>{100 - hybridHomeProb}%</b>}</div>
                 </div>
                 {hybridStage === "intro" && (
                   <div className="ai-analyzing-card">
-                    <strong>{t.aiIsAnalyzing}</strong>
+                    <strong>AI PREDICTS THIS MATCH</strong>
                   </div>
                 )}
                 {(hybridStage === "probability" || hybridStage === "meter") && (
