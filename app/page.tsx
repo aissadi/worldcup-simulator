@@ -1466,16 +1466,13 @@ export default function Home() {
           </div>
           <h1 style={{ textAlign: "center" }}><span>WORLD CUP 2026</span><span>PREDICTIONS</span></h1>
           <p className="subtitle" style={{ marginLeft: "auto", marginRight: "auto", textAlign: "center" }}>
-            Predict matches,<br />
-            reveal groups,<br />
-            simulate the knockout stage,<br />
-            and crown a champion.
+            Predict matches, reveal groups, simulate the knockout stage, and crown a champion.
           </p>
           <button className="quick-predict" onClick={startFullPrediction} style={{ alignSelf: "center" }}>
             <Sparkles size={22} />
             <span>{t.quickPredict}</span>
           </button>
-          <div className="home-grid">
+          <div className="home-grid" style={{ width: "100%", maxWidth: 520, marginLeft: "auto", marginRight: "auto" }}>
             <button className="home-card" onClick={() => openHomeCard("full")}><span>🌎</span><b>Full Tournament Journey</b><em>{t.fullTournamentCardText}</em></button>
             <button className="home-card" onClick={() => openHomeCard("group")}><span>🏟</span><b>Group Stage Reveal</b><em>{t.groupsCardText}</em></button>
             <button className="home-card" onClick={() => { setMatchTeamFilter(""); openHomeCard("singleMatch"); }}><span>⚽</span><b>Match Predictor</b><em>{t.oneMatchCardText}</em></button>
@@ -1483,7 +1480,7 @@ export default function Home() {
             <button className="home-card" onClick={() => openHomeCard("manual")}><span>✍</span><b>Build Your Champion</b><em>{t.buildBracketCardText}</em></button>
           </div>
           {featuredMatch && (
-            <section className="featured-prediction">
+            <section className="featured-prediction" style={{ width: "100%", maxWidth: 520, marginLeft: "auto", marginRight: "auto", textAlign: "center" }}>
               <p className="kicker">{t.featuredPrediction}</p>
               <div className="featured-match">
                 <strong>{flag(featuredMatch.home)} {featuredMatch.home}</strong>
@@ -1493,7 +1490,7 @@ export default function Home() {
               <button className="primary" onClick={openFeaturedPrediction}>{t.predictNow}</button>
             </section>
           )}
-          <section className="team-selector-panel">
+          <section className="team-selector-panel" style={{ width: "100%", maxWidth: 520, marginLeft: "auto", marginRight: "auto", textAlign: "center" }}>
             <p className="kicker">{t.chooseYourTeam}</p>
             <h2>{t.chooseYourTeam}</h2>
             <p>{t.chooseTeamSubtitle}</p>
@@ -1521,7 +1518,7 @@ export default function Home() {
             {selectedTeam && <p className="selected-team-note">✓ {tr(t.teamSelected, { team: selectedTeam })}</p>}
           </section>
           {selectedTeam && selectedTeamObject && (
-            <section className="team-hub">
+            <section className="team-hub" style={{ width: "100%", maxWidth: 520, marginLeft: "auto", marginRight: "auto", textAlign: "center" }}>
               <p className="kicker">{t.myTeamHub}</p>
               <div className="team-hub-title">
                 {flag(selectedTeam)}
