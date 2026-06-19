@@ -10,6 +10,7 @@ type Group = { id: string; teams: Team[] };
 type Standing = Team & { played: number; won: number; drawn: number; lost: number; gf: number; ga: number; gd: number; points: number };
 type Slot = { source: string; team: string };
 type Match = { id: number; home: string; away: string; homeSource: string; awaySource: string; hs: number; as: number; winner: string; label: string };
+type RoundOneResult = { group: string; teamA: string; teamB: string; scoreA: number; scoreB: number };
 type Flow = "full" | "group" | "singleMatch" | "knockout" | "manual";
 type RoundKey = "roundOf32" | "roundOf16" | "quarterfinals" | "semifinals" | "thirdPlaceMatch" | "final";
 type RoundSetKey = "roundOf16Set" | "quarterfinalsSet" | "semifinalsSet" | "finalSet";
@@ -86,6 +87,37 @@ const nextRounds = [
 ] as const;
 
 const groupFixtures = [[0, 1], [2, 3], [0, 2], [1, 3], [0, 3], [1, 2]];
+const roundOneResults: RoundOneResult[] = [
+  { group: "A", teamA: "Mexico", teamB: "South Africa", scoreA: 2, scoreB: 0 },
+  { group: "A", teamA: "South Korea", teamB: "Czechia", scoreA: 2, scoreB: 1 },
+  { group: "B", teamA: "Canada", teamB: "Bosnia and Herzegovina", scoreA: 1, scoreB: 1 },
+  { group: "D", teamA: "United States", teamB: "Paraguay", scoreA: 4, scoreB: 1 },
+  { group: "B", teamA: "Qatar", teamB: "Switzerland", scoreA: 1, scoreB: 1 },
+  { group: "C", teamA: "Brazil", teamB: "Morocco", scoreA: 1, scoreB: 1 },
+  { group: "C", teamA: "Haiti", teamB: "Scotland", scoreA: 0, scoreB: 1 },
+  { group: "D", teamA: "Australia", teamB: "Türkiye", scoreA: 2, scoreB: 0 },
+  { group: "E", teamA: "Germany", teamB: "Curaçao", scoreA: 7, scoreB: 1 },
+  { group: "F", teamA: "Netherlands", teamB: "Japan", scoreA: 2, scoreB: 2 },
+  { group: "E", teamA: "Ivory Coast", teamB: "Ecuador", scoreA: 1, scoreB: 0 },
+  { group: "F", teamA: "Sweden", teamB: "Tunisia", scoreA: 5, scoreB: 1 },
+  { group: "H", teamA: "Spain", teamB: "Cape Verde", scoreA: 0, scoreB: 0 },
+  { group: "G", teamA: "Belgium", teamB: "Egypt", scoreA: 1, scoreB: 1 },
+  { group: "H", teamA: "Saudi Arabia", teamB: "Uruguay", scoreA: 1, scoreB: 1 },
+  { group: "G", teamA: "Iran", teamB: "New Zealand", scoreA: 2, scoreB: 2 },
+  { group: "I", teamA: "France", teamB: "Senegal", scoreA: 3, scoreB: 1 },
+  { group: "I", teamA: "Iraq", teamB: "Norway", scoreA: 1, scoreB: 4 },
+  { group: "J", teamA: "Argentina", teamB: "Algeria", scoreA: 3, scoreB: 0 },
+  { group: "J", teamA: "Austria", teamB: "Jordan", scoreA: 3, scoreB: 1 },
+  { group: "K", teamA: "Portugal", teamB: "DR Congo", scoreA: 1, scoreB: 1 },
+  { group: "L", teamA: "England", teamB: "Croatia", scoreA: 4, scoreB: 2 },
+  { group: "L", teamA: "Ghana", teamB: "Panama", scoreA: 1, scoreB: 0 },
+  { group: "K", teamA: "Uzbekistan", teamB: "Colombia", scoreA: 1, scoreB: 3 }
+];
+const roundOneResultMap = new Map<string, { hs: number; as: number }>();
+roundOneResults.forEach((result) => {
+  roundOneResultMap.set(`${result.group}:${result.teamA}:${result.teamB}`, { hs: result.scoreA, as: result.scoreB });
+  roundOneResultMap.set(`${result.group}:${result.teamB}:${result.teamA}`, { hs: result.scoreB, as: result.scoreA });
+});
 const bracketLayout = {
   left: [[73, 75, 74, 77, 83, 84, 81, 82], [89, 90, 93, 94], [97, 98], [101]],
   right: [[76, 78, 79, 80, 86, 88, 85, 87], [91, 92, 95, 96], [99, 100], [102]]
@@ -130,6 +162,10 @@ function goals(rating: number, opponent: number, rng: () => number) {
 
 function decide(home: Team, away: Team, rng: () => number) {
   return { hs: goals(home.rating, away.rating, rng), as: goals(away.rating, home.rating, rng) };
+}
+
+function roundOneScore(group: string, home: string, away: string) {
+  return roundOneResultMap.get(`${group}:${home}:${away}`);
 }
 
 function knockout(home: Slot, away: Slot, teams: Map<string, Team>, id: number, rng: () => number): Match {
@@ -195,7 +231,8 @@ function simulate(seed: number) {
     groupFixtures.forEach(([h, a]) => {
       const home = group.teams[h];
       const away = group.teams[a];
-      const { hs, as } = decide(home, away, rng);
+      const fixedScore = roundOneScore(group.id, home.name, away.name);
+      const { hs, as } = fixedScore ?? decide(home, away, rng);
       const hr = rows.get(home.name)!;
       const ar = rows.get(away.name)!;
       hr.played++; ar.played++; hr.gf += hs; hr.ga += as; ar.gf += as; ar.ga += hs;
@@ -242,15 +279,17 @@ function simulate(seed: number) {
 function buildGroupPredictionMatches(seed: number) {
   const rng = rngFrom(seed + 2026);
   let id = 1;
-  return groups.flatMap((group) => groupFixtures.map(([h, a], fixtureIndex) => {
+  return groups.flatMap((group) => groupFixtures.flatMap(([h, a], fixtureIndex) => {
     const home = group.teams[h];
     const away = group.teams[a];
+    const fixedScore = roundOneScore(group.id, home.name, away.name);
+    if (fixedScore) return [];
     let { hs, as } = decide(home, away, rng);
     if (hs === as) {
       const swing = home.rating - away.rating + (rng() - 0.5) * 18;
       swing >= 0 ? hs++ : as++;
     }
-    return {
+    return [{
       id: id++,
       home: home.name,
       away: away.name,
@@ -260,7 +299,7 @@ function buildGroupPredictionMatches(seed: number) {
       as,
       winner: hs > as ? home.name : away.name,
       label: `G${group.id}-${fixtureIndex + 1}`
-    };
+    }];
   }));
 }
 
