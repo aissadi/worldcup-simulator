@@ -11,6 +11,20 @@ type Standing = Team & { played: number; won: number; drawn: number; lost: numbe
 type Slot = { source: string; team: string };
 type Match = { id: number; home: string; away: string; homeSource: string; awaySource: string; hs: number; as: number; winner: string; label: string };
 type RoundOneResult = { group: string; teamA: string; teamB: string; scoreA: number; scoreB: number };
+type CurrentRealGroupStanding = {
+  team: string;
+  group: string;
+  played: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  goalDifference: number;
+  points: number;
+};
+type QualifierSet = { groupWinners: Standing[]; runnersUp: Standing[]; bestThirds: Standing[]; qualifiedTeams: Standing[] };
+type RoundOf32Fixture = { id: string; teamA: Slot; teamB: Slot };
 type Flow = "full" | "group" | "singleMatch" | "knockout" | "manual";
 type RoundKey = "roundOf32" | "roundOf16" | "quarterfinals" | "semifinals" | "thirdPlaceMatch" | "final";
 type RoundSetKey = "roundOf16Set" | "quarterfinalsSet" | "semifinalsSet" | "finalSet";
@@ -21,6 +35,7 @@ type ManualMatch = { id: number; home?: string; away?: string; homeSource: strin
 
 const BRACKET_CANVAS_WIDTH = 3000;
 const BRACKET_CANVAS_HEIGHT = 1540;
+const USE_REAL_STANDINGS_FOR_KNOCKOUT = true;
 
 const flagEmoji: Record<string, string> = {
   "Mexico": "🇲🇽", "South Africa": "🇿🇦", "South Korea": "🇰🇷", "Czechia": "🇨🇿",
@@ -79,6 +94,13 @@ const fixedR32 = [
   [85, "1B", "3EFGIJ"], [86, "1J", "2H"], [87, "1K", "3DEIJL"], [88, "2D", "2G"]
 ] as const;
 
+const officialRoundOf32Mapping = [
+  [73, "2A", "2B"], [76, "1C", "2F"], [74, "1E", "3ABCDF"], [75, "1F", "2C"],
+  [78, "2E", "2I"], [77, "1I", "3CDFGH"], [79, "1A", "3CEFHI"], [80, "1L", "3EHIJK"],
+  [82, "1G", "3AEHIJ"], [81, "1D", "3BEFJ"], [84, "1H", "2J"], [83, "2K", "2L"],
+  [85, "1B", "3EFGIJ"], [88, "2D", "2G"], [86, "1J", "2H"], [87, "1K", "3DEIJL"]
+] as const;
+
 const nextRounds = [
   [89, 73, 75], [90, 74, 77], [91, 76, 78], [92, 79, 80],
   [93, 83, 84], [94, 81, 82], [95, 86, 88], [96, 85, 87],
@@ -113,6 +135,58 @@ const roundOneResults: RoundOneResult[] = [
   { group: "L", teamA: "Ghana", teamB: "Panama", scoreA: 1, scoreB: 0 },
   { group: "K", teamA: "Uzbekistan", teamB: "Colombia", scoreA: 1, scoreB: 3 }
 ];
+
+const CURRENT_REAL_GROUP_STANDINGS: CurrentRealGroupStanding[] = [
+  { team: "Mexico", group: "A", played: 1, wins: 1, draws: 0, losses: 0, goalsFor: 2, goalsAgainst: 0, goalDifference: 2, points: 3 },
+  { team: "South Africa", group: "A", played: 1, wins: 0, draws: 0, losses: 1, goalsFor: 0, goalsAgainst: 2, goalDifference: -2, points: 0 },
+  { team: "South Korea", group: "A", played: 1, wins: 1, draws: 0, losses: 0, goalsFor: 2, goalsAgainst: 1, goalDifference: 1, points: 3 },
+  { team: "Czechia", group: "A", played: 1, wins: 0, draws: 0, losses: 1, goalsFor: 1, goalsAgainst: 2, goalDifference: -1, points: 0 },
+  { team: "Canada", group: "B", played: 1, wins: 0, draws: 1, losses: 0, goalsFor: 1, goalsAgainst: 1, goalDifference: 0, points: 1 },
+  { team: "Bosnia and Herzegovina", group: "B", played: 1, wins: 0, draws: 1, losses: 0, goalsFor: 1, goalsAgainst: 1, goalDifference: 0, points: 1 },
+  { team: "Qatar", group: "B", played: 1, wins: 0, draws: 1, losses: 0, goalsFor: 1, goalsAgainst: 1, goalDifference: 0, points: 1 },
+  { team: "Switzerland", group: "B", played: 1, wins: 0, draws: 1, losses: 0, goalsFor: 1, goalsAgainst: 1, goalDifference: 0, points: 1 },
+  { team: "Brazil", group: "C", played: 1, wins: 0, draws: 1, losses: 0, goalsFor: 1, goalsAgainst: 1, goalDifference: 0, points: 1 },
+  { team: "Morocco", group: "C", played: 1, wins: 0, draws: 1, losses: 0, goalsFor: 1, goalsAgainst: 1, goalDifference: 0, points: 1 },
+  { team: "Haiti", group: "C", played: 1, wins: 0, draws: 0, losses: 1, goalsFor: 0, goalsAgainst: 1, goalDifference: -1, points: 0 },
+  { team: "Scotland", group: "C", played: 1, wins: 1, draws: 0, losses: 0, goalsFor: 1, goalsAgainst: 0, goalDifference: 1, points: 3 },
+  { team: "United States", group: "D", played: 1, wins: 1, draws: 0, losses: 0, goalsFor: 4, goalsAgainst: 1, goalDifference: 3, points: 3 },
+  { team: "Paraguay", group: "D", played: 1, wins: 0, draws: 0, losses: 1, goalsFor: 1, goalsAgainst: 4, goalDifference: -3, points: 0 },
+  { team: "TÃ¼rkiye", group: "D", played: 1, wins: 0, draws: 0, losses: 1, goalsFor: 0, goalsAgainst: 2, goalDifference: -2, points: 0 },
+  { team: "Australia", group: "D", played: 1, wins: 1, draws: 0, losses: 0, goalsFor: 2, goalsAgainst: 0, goalDifference: 2, points: 3 },
+  { team: "Germany", group: "E", played: 1, wins: 1, draws: 0, losses: 0, goalsFor: 7, goalsAgainst: 1, goalDifference: 6, points: 3 },
+  { team: "CuraÃ§ao", group: "E", played: 1, wins: 0, draws: 0, losses: 1, goalsFor: 1, goalsAgainst: 7, goalDifference: -6, points: 0 },
+  { team: "Ecuador", group: "E", played: 1, wins: 0, draws: 0, losses: 1, goalsFor: 0, goalsAgainst: 1, goalDifference: -1, points: 0 },
+  { team: "Ivory Coast", group: "E", played: 1, wins: 1, draws: 0, losses: 0, goalsFor: 1, goalsAgainst: 0, goalDifference: 1, points: 3 },
+  { team: "Netherlands", group: "F", played: 1, wins: 0, draws: 1, losses: 0, goalsFor: 2, goalsAgainst: 2, goalDifference: 0, points: 1 },
+  { team: "Japan", group: "F", played: 1, wins: 0, draws: 1, losses: 0, goalsFor: 2, goalsAgainst: 2, goalDifference: 0, points: 1 },
+  { team: "Sweden", group: "F", played: 1, wins: 1, draws: 0, losses: 0, goalsFor: 5, goalsAgainst: 1, goalDifference: 4, points: 3 },
+  { team: "Tunisia", group: "F", played: 1, wins: 0, draws: 0, losses: 1, goalsFor: 1, goalsAgainst: 5, goalDifference: -4, points: 0 },
+  { team: "Belgium", group: "G", played: 1, wins: 0, draws: 1, losses: 0, goalsFor: 1, goalsAgainst: 1, goalDifference: 0, points: 1 },
+  { team: "Egypt", group: "G", played: 1, wins: 0, draws: 1, losses: 0, goalsFor: 1, goalsAgainst: 1, goalDifference: 0, points: 1 },
+  { team: "Iran", group: "G", played: 1, wins: 0, draws: 1, losses: 0, goalsFor: 2, goalsAgainst: 2, goalDifference: 0, points: 1 },
+  { team: "New Zealand", group: "G", played: 1, wins: 0, draws: 1, losses: 0, goalsFor: 2, goalsAgainst: 2, goalDifference: 0, points: 1 },
+  { team: "Spain", group: "H", played: 1, wins: 0, draws: 1, losses: 0, goalsFor: 0, goalsAgainst: 0, goalDifference: 0, points: 1 },
+  { team: "Saudi Arabia", group: "H", played: 1, wins: 0, draws: 1, losses: 0, goalsFor: 1, goalsAgainst: 1, goalDifference: 0, points: 1 },
+  { team: "Uruguay", group: "H", played: 1, wins: 0, draws: 1, losses: 0, goalsFor: 1, goalsAgainst: 1, goalDifference: 0, points: 1 },
+  { team: "Cape Verde", group: "H", played: 1, wins: 0, draws: 1, losses: 0, goalsFor: 0, goalsAgainst: 0, goalDifference: 0, points: 1 },
+  { team: "France", group: "I", played: 1, wins: 1, draws: 0, losses: 0, goalsFor: 3, goalsAgainst: 1, goalDifference: 2, points: 3 },
+  { team: "Senegal", group: "I", played: 1, wins: 0, draws: 0, losses: 1, goalsFor: 1, goalsAgainst: 3, goalDifference: -2, points: 0 },
+  { team: "Norway", group: "I", played: 1, wins: 1, draws: 0, losses: 0, goalsFor: 4, goalsAgainst: 1, goalDifference: 3, points: 3 },
+  { team: "Iraq", group: "I", played: 1, wins: 0, draws: 0, losses: 1, goalsFor: 1, goalsAgainst: 4, goalDifference: -3, points: 0 },
+  { team: "Argentina", group: "J", played: 1, wins: 1, draws: 0, losses: 0, goalsFor: 3, goalsAgainst: 0, goalDifference: 3, points: 3 },
+  { team: "Algeria", group: "J", played: 1, wins: 0, draws: 0, losses: 1, goalsFor: 0, goalsAgainst: 3, goalDifference: -3, points: 0 },
+  { team: "Austria", group: "J", played: 1, wins: 1, draws: 0, losses: 0, goalsFor: 3, goalsAgainst: 1, goalDifference: 2, points: 3 },
+  { team: "Jordan", group: "J", played: 1, wins: 0, draws: 0, losses: 1, goalsFor: 1, goalsAgainst: 3, goalDifference: -2, points: 0 },
+  { team: "Portugal", group: "K", played: 1, wins: 0, draws: 1, losses: 0, goalsFor: 1, goalsAgainst: 1, goalDifference: 0, points: 1 },
+  { team: "DR Congo", group: "K", played: 1, wins: 0, draws: 1, losses: 0, goalsFor: 1, goalsAgainst: 1, goalDifference: 0, points: 1 },
+  { team: "Uzbekistan", group: "K", played: 1, wins: 0, draws: 0, losses: 1, goalsFor: 1, goalsAgainst: 3, goalDifference: -2, points: 0 },
+  { team: "Colombia", group: "K", played: 1, wins: 1, draws: 0, losses: 0, goalsFor: 3, goalsAgainst: 1, goalDifference: 2, points: 3 },
+  { team: "England", group: "L", played: 1, wins: 1, draws: 0, losses: 0, goalsFor: 4, goalsAgainst: 2, goalDifference: 2, points: 3 },
+  { team: "Ghana", group: "L", played: 1, wins: 1, draws: 0, losses: 0, goalsFor: 1, goalsAgainst: 0, goalDifference: 1, points: 3 },
+  { team: "Croatia", group: "L", played: 1, wins: 0, draws: 0, losses: 1, goalsFor: 2, goalsAgainst: 4, goalDifference: -2, points: 0 },
+  { team: "Panama", group: "L", played: 1, wins: 0, draws: 0, losses: 1, goalsFor: 0, goalsAgainst: 1, goalDifference: -1, points: 0 }
+];
+
 const roundOneResultMap = new Map<string, { hs: number; as: number }>();
 roundOneResults.forEach((result) => {
   roundOneResultMap.set(`${result.group}:${result.teamA}:${result.teamB}`, { hs: result.scoreA, as: result.scoreB });
@@ -168,9 +242,90 @@ function roundOneScore(group: string, home: string, away: string) {
   return roundOneResultMap.get(`${group}:${home}:${away}`);
 }
 
+function sortStandings<T extends { points: number; goalDifference?: number; gd?: number; goalsFor?: number; gf?: number; team?: string; name?: string }>(a: T, b: T) {
+  return b.points - a.points
+    || (b.goalDifference ?? b.gd ?? 0) - (a.goalDifference ?? a.gd ?? 0)
+    || (b.goalsFor ?? b.gf ?? 0) - (a.goalsFor ?? a.gf ?? 0)
+    || (a.team ?? a.name ?? "").localeCompare(b.team ?? b.name ?? "");
+}
+
+function realStandingToStanding(row: CurrentRealGroupStanding): Standing {
+  const selected = allTeams.find((item) => item.name === row.team);
+  return {
+    ...(selected || { name: row.team, rating: 70, group: row.group, flag: "", code: undefined }),
+    group: row.group,
+    played: row.played,
+    won: row.wins,
+    drawn: row.draws,
+    lost: row.losses,
+    gf: row.goalsFor,
+    ga: row.goalsAgainst,
+    gd: row.goalDifference,
+    points: row.points
+  };
+}
+
+function buildTablesFromRealStandings(standings: CurrentRealGroupStanding[]) {
+  return groups.map((group) => {
+    const rows = standings
+      .filter((row) => row.group === group.id)
+      .map(realStandingToStanding)
+      .sort(sortStandings);
+    return { group: group.id, standings: rows };
+  });
+}
+
+function getQualifiersFromStandings(standings: CurrentRealGroupStanding[]): QualifierSet {
+  const tables = buildTablesFromRealStandings(standings);
+  const groupWinners = tables.map((table) => table.standings[0]).filter((team): team is Standing => Boolean(team));
+  const runnersUp = tables.map((table) => table.standings[1]).filter((team): team is Standing => Boolean(team));
+  const thirdPlaceTeams = tables.map((table) => table.standings[2]).filter((team): team is Standing => Boolean(team));
+  const bestThirds = [...thirdPlaceTeams].sort(sortStandings).slice(0, 8);
+  return { groupWinners, runnersUp, bestThirds, qualifiedTeams: [...groupWinners, ...runnersUp, ...bestThirds] };
+}
+
+function resolveThirdPlaceSlot(slotCode: string, bestThirds: Standing[], usedThirdGroups = new Set<string>()) {
+  const eligibleGroups = slotCode.slice(1).split("");
+  return bestThirds.find((team) => eligibleGroups.includes(team.group) && !usedThirdGroups.has(team.group));
+}
+
+function buildRoundOf32FromRealStandings(standings: CurrentRealGroupStanding[]): RoundOf32Fixture[] {
+  const qualifiers = getQualifiersFromStandings(standings);
+  const slots = new Map<string, Slot>();
+  qualifiers.groupWinners.forEach((team) => slots.set(`1${team.group}`, { source: `1${team.group}`, team: team.name }));
+  qualifiers.runnersUp.forEach((team) => slots.set(`2${team.group}`, { source: `2${team.group}`, team: team.name }));
+  const usedThirdGroups = new Set<string>();
+
+  function resolveSlot(code: string): Slot {
+    if (code.startsWith("3") && code.length > 2) {
+      const third = resolveThirdPlaceSlot(code, qualifiers.bestThirds, usedThirdGroups);
+      if (!third) return { source: code, team: "Pending" };
+      usedThirdGroups.add(third.group);
+      return { source: `3${third.group}`, team: third.name };
+    }
+    return slots.get(code) || { source: code, team: "Pending" };
+  }
+
+  return officialRoundOf32Mapping.map(([id, home, away]) => ({
+    id: `M${id}`,
+    teamA: resolveSlot(home),
+    teamB: resolveSlot(away)
+  }));
+}
+
+function logRealStandingsChecks(qualifiers: QualifierSet, fixtures: RoundOf32Fixture[]) {
+  const teams = fixtures.flatMap((fixture) => [fixture.teamA.team, fixture.teamB.team]).filter((name) => name !== "Pending");
+  const duplicates = teams.filter((name, index) => teams.indexOf(name) !== index);
+  console.info("[World Cup real standings] group winners:", qualifiers.groupWinners.length);
+  console.info("[World Cup real standings] runners-up:", qualifiers.runnersUp.length);
+  console.info("[World Cup real standings] best third-place teams:", qualifiers.bestThirds.length);
+  console.info("[World Cup real standings] Round of 32 fixtures:", fixtures.length);
+  console.info("[World Cup real standings] duplicate teams:", duplicates.length ? duplicates : "none");
+}
+
 function knockout(home: Slot, away: Slot, teams: Map<string, Team>, id: number, rng: () => number): Match {
-  const ht = teams.get(home.team)!;
-  const at = teams.get(away.team)!;
+  const ht = teams.get(home.team) || team(home.team);
+  const at = teams.get(away.team) || team(away.team);
   let { hs, as } = decide(ht, at, rng);
   if (hs === as) {
     const swing = ht.rating - at.rating + (rng() - 0.5) * 28;
@@ -224,6 +379,8 @@ function assignThirdPlaceSlots(bestThirds: Standing[]) {
 }
 
 function simulate(seed: number) {
+  if (USE_REAL_STANDINGS_FOR_KNOCKOUT) return buildRealTournamentFromStandings(seed, CURRENT_REAL_GROUP_STANDINGS);
+
   const rng = rngFrom(seed);
   const teams = new Map(groups.flatMap((g) => g.teams.map((t) => [t.name, t])));
   const tables = groups.map((group) => {
@@ -274,6 +431,32 @@ function simulate(seed: number) {
   });
 
   return { tables, bestThirds, matches: [...matches.values()].sort((a, b) => a.id - b.id), champion: matches.get(104)!.winner };
+}
+
+function buildRealTournamentFromStandings(seed: number, standings: CurrentRealGroupStanding[]) {
+  const rng = rngFrom(seed);
+  const teams = new Map(groups.flatMap((g) => g.teams.map((t) => [t.name, t])));
+  const tables = buildTablesFromRealStandings(standings);
+  const qualifiers = getQualifiersFromStandings(standings);
+  const roundOf32 = buildRoundOf32FromRealStandings(standings);
+  logRealStandingsChecks(qualifiers, roundOf32);
+
+  const matches = new Map<number, Match>();
+  roundOf32.forEach((fixture) => {
+    const id = Number(fixture.id.slice(1));
+    matches.set(id, knockout(fixture.teamA, fixture.teamB, teams, id, rng));
+  });
+
+  nextRounds.forEach(([id, a, b]) => {
+    const isThirdPlace = id === 103;
+    const ma = matches.get(a)!;
+    const mb = matches.get(b)!;
+    const home = { source: `${isThirdPlace ? "L" : "W"}${a}`, team: isThirdPlace ? loser(ma) : ma.winner };
+    const away = { source: `${isThirdPlace ? "L" : "W"}${b}`, team: isThirdPlace ? loser(mb) : mb.winner };
+    matches.set(id, knockout(home, away, teams, id, rng));
+  });
+
+  return { tables, bestThirds: qualifiers.bestThirds, matches: [...matches.values()].sort((a, b) => a.id - b.id), champion: matches.get(104)!.winner };
 }
 
 function buildGroupPredictionMatches(seed: number) {
@@ -379,7 +562,7 @@ function buildManualMatches(picks: Record<string, BuilderPick>, thirdGroups: str
 }
 
 function team(name: string) {
-  return groups.flatMap((group) => group.teams).find((item) => item.name === name)!;
+  return groups.flatMap((group) => group.teams).find((item) => item.name === name) || { name, rating: 70, group: "", flag: "", code: undefined };
 }
 
 function flag(name: string, size = "normal") {
