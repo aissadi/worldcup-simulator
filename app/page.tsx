@@ -109,7 +109,7 @@ const nextRounds = [
 ] as const;
 
 const groupFixtures = [[0, 1], [2, 3], [0, 2], [1, 3], [0, 3], [1, 2]];
-const roundOneResults: RoundOneResult[] = [
+const COMPLETED_GROUP_RESULTS: RoundOneResult[] = [
   { group: "A", teamA: "Mexico", teamB: "South Africa", scoreA: 2, scoreB: 0 },
   { group: "A", teamA: "South Korea", teamB: "Czechia", scoreA: 2, scoreB: 1 },
   { group: "B", teamA: "Canada", teamB: "Bosnia and Herzegovina", scoreA: 1, scoreB: 1 },
@@ -135,6 +135,7 @@ const roundOneResults: RoundOneResult[] = [
   { group: "L", teamA: "Ghana", teamB: "Panama", scoreA: 1, scoreB: 0 },
   { group: "K", teamA: "Uzbekistan", teamB: "Colombia", scoreA: 1, scoreB: 3 }
 ];
+const roundOneResults = COMPLETED_GROUP_RESULTS;
 
 const CURRENT_REAL_GROUP_STANDINGS: CurrentRealGroupStanding[] = [
   { team: "Mexico", group: "A", played: 1, wins: 1, draws: 0, losses: 0, goalsFor: 2, goalsAgainst: 0, goalDifference: 2, points: 3 },
@@ -267,16 +268,16 @@ function realStandingToStanding(row: CurrentRealGroupStanding): Standing {
 
 function buildTablesFromRealStandings(standings: CurrentRealGroupStanding[]) {
   return groups.map((group) => {
-    const rows = standings
+    const rowsByName = new Map(group.teams.map((team) => [team.name, { ...team, played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, gd: 0, points: 0 } as Standing]));
+    standings
       .filter((row) => row.group === group.id)
-      .map(realStandingToStanding)
-      .sort(sortStandings);
+      .forEach((row) => rowsByName.set(row.team, realStandingToStanding(row)));
+    const rows = [...rowsByName.values()].sort(sortStandings);
     return { group: group.id, standings: rows };
   });
 }
 
-function getQualifiersFromStandings(standings: CurrentRealGroupStanding[]): QualifierSet {
-  const tables = buildTablesFromRealStandings(standings);
+function getQualifiersFromTables(tables: Array<{ group: string; standings: Standing[] }>): QualifierSet {
   const groupWinners = tables.map((table) => table.standings[0]).filter((team): team is Standing => Boolean(team));
   const runnersUp = tables.map((table) => table.standings[1]).filter((team): team is Standing => Boolean(team));
   const thirdPlaceTeams = tables.map((table) => table.standings[2]).filter((team): team is Standing => Boolean(team));
@@ -284,13 +285,16 @@ function getQualifiersFromStandings(standings: CurrentRealGroupStanding[]): Qual
   return { groupWinners, runnersUp, bestThirds, qualifiedTeams: [...groupWinners, ...runnersUp, ...bestThirds] };
 }
 
+function getQualifiersFromStandings(standings: CurrentRealGroupStanding[]): QualifierSet {
+  return getQualifiersFromTables(buildTablesFromRealStandings(standings));
+}
+
 function resolveThirdPlaceSlot(slotCode: string, bestThirds: Standing[], usedThirdGroups = new Set<string>()) {
   const eligibleGroups = slotCode.slice(1).split("");
   return bestThirds.find((team) => eligibleGroups.includes(team.group) && !usedThirdGroups.has(team.group));
 }
 
-function buildRoundOf32FromRealStandings(standings: CurrentRealGroupStanding[]): RoundOf32Fixture[] {
-  const qualifiers = getQualifiersFromStandings(standings);
+function buildRoundOf32FromQualifiers(qualifiers: QualifierSet): RoundOf32Fixture[] {
   const slots = new Map<string, Slot>();
   qualifiers.groupWinners.forEach((team) => slots.set(`1${team.group}`, { source: `1${team.group}`, team: team.name }));
   qualifiers.runnersUp.forEach((team) => slots.set(`2${team.group}`, { source: `2${team.group}`, team: team.name }));
@@ -311,6 +315,38 @@ function buildRoundOf32FromRealStandings(standings: CurrentRealGroupStanding[]):
     teamA: resolveSlot(home),
     teamB: resolveSlot(away)
   }));
+}
+
+function buildRoundOf32FromRealStandings(standings: CurrentRealGroupStanding[]): RoundOf32Fixture[] {
+  return buildRoundOf32FromQualifiers(getQualifiersFromStandings(standings));
+}
+
+function applyGroupResult(rows: Map<string, Standing>, home: string, away: string, hs: number, as: number) {
+  const hr = rows.get(home);
+  const ar = rows.get(away);
+  if (!hr || !ar) return;
+  hr.played++; ar.played++; hr.gf += hs; hr.ga += as; ar.gf += as; ar.ga += hs;
+  if (hs > as) { hr.won++; ar.lost++; hr.points += 3; }
+  else if (as > hs) { ar.won++; hr.lost++; ar.points += 3; }
+  else { hr.drawn++; ar.drawn++; hr.points++; ar.points++; }
+  hr.gd = hr.gf - hr.ga; ar.gd = ar.gf - ar.ga;
+}
+
+function buildProjectedTablesFromRealStandings(seed: number, standings: CurrentRealGroupStanding[]) {
+  const rng = rngFrom(seed);
+  const realTables = buildTablesFromRealStandings(standings);
+  return groups.map((group) => {
+    const realTable = realTables.find((table) => table.group === group.id);
+    const rows = new Map((realTable?.standings || []).map((team) => [team.name, { ...team } as Standing]));
+    groupFixtures.forEach(([h, a]) => {
+      const home = group.teams[h];
+      const away = group.teams[a];
+      if (roundOneScore(group.id, home.name, away.name)) return;
+      const { hs, as } = decide(home, away, rng);
+      applyGroupResult(rows, home.name, away.name, hs, as);
+    });
+    return { group: group.id, standings: [...rows.values()].sort(sortStandings) };
+  });
 }
 
 function logRealStandingsChecks(qualifiers: QualifierSet, fixtures: RoundOf32Fixture[]) {
@@ -436,9 +472,9 @@ function simulate(seed: number) {
 function buildRealTournamentFromStandings(seed: number, standings: CurrentRealGroupStanding[]) {
   const rng = rngFrom(seed);
   const teams = new Map(groups.flatMap((g) => g.teams.map((t) => [t.name, t])));
-  const tables = buildTablesFromRealStandings(standings);
-  const qualifiers = getQualifiersFromStandings(standings);
-  const roundOf32 = buildRoundOf32FromRealStandings(standings);
+  const tables = buildProjectedTablesFromRealStandings(seed, standings);
+  const qualifiers = getQualifiersFromTables(tables);
+  const roundOf32 = buildRoundOf32FromQualifiers(qualifiers);
   logRealStandingsChecks(qualifiers, roundOf32);
 
   const matches = new Map<number, Match>();
@@ -706,6 +742,9 @@ export default function Home() {
   const popularTeams = ["Morocco", "Argentina", "Brazil", "France", "Spain"];
   const selectedTeamMatches = selectedTeam
     ? groupPredictionMatches.filter((match) => match.home === selectedTeam || match.away === selectedTeam)
+    : [];
+  const selectedTeamResults = selectedTeam
+    ? COMPLETED_GROUP_RESULTS.filter((match) => match.teamA === selectedTeam || match.teamB === selectedTeam)
     : [];
   const featuredMatchIndex = useMemo(() => {
     const indexedMatches = groupPredictionMatches.map((match, index) => ({ match, index }));
@@ -1773,6 +1812,7 @@ export default function Home() {
               </div>
               <p>{tr(t.upcomingPredictionsCount, { count: String(selectedTeamMatches.length) })}</p>
               <div className="team-hub-list">
+                {selectedTeamMatches.length === 0 && <p className="step">No upcoming group games left.</p>}
                 {selectedTeamMatches.slice(0, 5).map((match) => {
                   const index = groupPredictionMatches.findIndex((item) => item.id === match.id);
                   return (
@@ -1784,6 +1824,20 @@ export default function Home() {
                   );
                 })}
               </div>
+              {selectedTeamResults.length > 0 && (
+                <>
+                  <p className="kicker">Results</p>
+                  <div className="team-hub-list">
+                    {selectedTeamResults.map((match) => (
+                      <button key={`${match.group}-${match.teamA}-${match.teamB}`} type="button" disabled>
+                        <span>{flag(match.teamA)} {match.teamA}</span>
+                        <em>{match.scoreA} - {match.scoreB}</em>
+                        <span>{flag(match.teamB)} {match.teamB}</span>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
               <button className="primary" onClick={() => openTeamPredictions(selectedTeam)}>
                 {tr(t.viewAllTeamPredictions, { team: selectedTeam })}
               </button>
@@ -1913,6 +1967,7 @@ export default function Home() {
           <p className="step">{t.groupStageMatchesOnly}</p>
           <div className="match-list">
             {matchTeamFilter && <p className="team-filter">{flag(matchTeamFilter)} {tr(t.predictionsInvolving, { team: matchTeamFilter })}</p>}
+            {filteredPredictionMatches.length === 0 && <p className="step">No upcoming group games left.</p>}
             {filteredPredictionMatches.map((match) => {
               const index = groupPredictionMatches.findIndex((item) => item.id === match.id);
               return (
