@@ -2,6 +2,7 @@
 
 import { ChevronLeft, House, Share2, Sparkles, Trophy, Volume2, Zap } from "lucide-react";
 import { type CSSProperties, type ReactNode, type TouchEvent, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { isSupabaseConfigured, supabase, type PredictionPicks, type PredictionRow } from "../lib/supabase";
 import { languageOptions, locales, type LocaleCode } from "../locales";
 
 type Phase = "home" | "leaderboard" | "fullIntro" | "tournamentGroup" | "groupSelect" | "groupReveal" | "bestThirds" | "matchSelect" | "predictor" | "knockout" | "roundSet" | "championDecision" | "champion" | "builderGroup" | "builderThirds" | "builderBracket";
@@ -12,7 +13,7 @@ type Slot = { source: string; team: string };
 type Match = { id: number; home: string; away: string; homeSource: string; awaySource: string; hs: number; as: number; winner: string; label: string };
 type RoundOneResult = { group: string; teamA: string; teamB: string; scoreA: number; scoreB: number };
 type CompletedKnockoutResult = { id: number; home: string; away: string; scoreA: number; scoreB: number; penaltyScoreA?: number; penaltyScoreB?: number; winner: string };
-type LeaderboardEntry = { name: string; champion: string; createdAt: string };
+type LeaderboardEntry = { id?: string; name: string; champion: string; picks: PredictionPicks; correctPicks: number; totalCompletedMatches: number; createdAt: string };
 type CurrentRealGroupStanding = {
   team: string;
   group: string;
@@ -401,6 +402,35 @@ function isCompletedKnockoutMatch(matchId: number) {
 
 function completedKnockoutWinner(matchId: number) {
   return completedKnockoutResultMap.get(matchId)?.winner;
+}
+
+function normalizePicks(picks: Record<number, string> | PredictionPicks): PredictionPicks {
+  return Object.fromEntries(Object.entries(picks).map(([matchId, winner]) => [String(matchId), winner]));
+}
+
+function scorePredictionPicks(picks: PredictionPicks) {
+  return COMPLETED_KNOCKOUT_RESULTS.reduce((score, match) => (
+    picks[String(match.id)] === match.winner ? score + 1 : score
+  ), 0);
+}
+
+function rowToLeaderboardEntry(row: PredictionRow): LeaderboardEntry {
+  const picks = row.picks || {};
+  return {
+    id: row.id,
+    name: row.player_name,
+    champion: row.champion || "Pending",
+    picks,
+    correctPicks: row.correct_picks ?? scorePredictionPicks(picks),
+    totalCompletedMatches: row.total_completed_matches ?? COMPLETED_KNOCKOUT_RESULTS.length,
+    createdAt: row.created_at
+  };
+}
+
+function sortLeaderboardEntries(entries: LeaderboardEntry[]) {
+  return [...entries].sort((a, b) => (
+    b.correctPicks - a.correctPicks || new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+  ));
 }
 
 function applyCompletedKnockoutResults(matches: Map<number, Match>) {
@@ -898,12 +928,26 @@ export default function Home() {
     const savedLeaderboard = window.localStorage.getItem("worldcup-leaderboard");
     if (savedLeaderboard) {
       try {
-        const entries = JSON.parse(savedLeaderboard) as LeaderboardEntry[];
-        if (Array.isArray(entries)) setLeaderboard(entries);
+        const entries = JSON.parse(savedLeaderboard) as Array<Partial<LeaderboardEntry>>;
+        if (Array.isArray(entries)) {
+          setLeaderboard(sortLeaderboardEntries(entries.map((entry) => {
+            const picks = entry.picks || {};
+            return {
+              id: entry.id,
+              name: entry.name || "Player",
+              champion: entry.champion || "Pending",
+              picks,
+              correctPicks: entry.correctPicks ?? scorePredictionPicks(picks),
+              totalCompletedMatches: entry.totalCompletedMatches ?? COMPLETED_KNOCKOUT_RESULTS.length,
+              createdAt: entry.createdAt || new Date().toISOString()
+            };
+          })));
+        }
       } catch {
         setLeaderboard([]);
       }
     }
+    void loadSharedLeaderboard();
   }, []);
 
   useEffect(() => {
@@ -1226,13 +1270,44 @@ export default function Home() {
     setPhase("builderBracket");
   }
 
-  function saveLeaderboardResult(championName: string) {
+  async function loadSharedLeaderboard() {
+    if (!isSupabaseConfigured || !supabase) return;
+    const { data, error } = await supabase
+      .from("predictions")
+      .select("id, player_name, champion, picks, correct_picks, total_completed_matches, created_at")
+      .order("correct_picks", { ascending: false })
+      .order("created_at", { ascending: true });
+    if (error || !data) return;
+    setLeaderboard(data.map(rowToLeaderboardEntry));
+  }
+
+  async function saveLeaderboardResult(championName: string, picks: Record<number, string> | PredictionPicks) {
     const cleanName = playerName.trim();
     if (!cleanName) return;
-    setLeaderboard((previous) => [
-      { name: cleanName, champion: championName, createdAt: new Date().toISOString() },
-      ...previous.filter((entry) => !(entry.name === cleanName && entry.champion === championName)).slice(0, 19)
-    ]);
+    const normalizedPicks = normalizePicks(picks);
+    const entry: LeaderboardEntry = {
+      name: cleanName,
+      champion: championName,
+      picks: normalizedPicks,
+      correctPicks: scorePredictionPicks(normalizedPicks),
+      totalCompletedMatches: COMPLETED_KNOCKOUT_RESULTS.length,
+      createdAt: new Date().toISOString()
+    };
+
+    setLeaderboard((previous) => sortLeaderboardEntries([
+      entry,
+      ...previous.filter((item) => !(item.name === cleanName && item.champion === championName))
+    ]).slice(0, 20));
+
+    if (!isSupabaseConfigured || !supabase) return;
+    const { error } = await supabase.from("predictions").insert({
+      player_name: cleanName,
+      champion: championName,
+      picks: normalizedPicks,
+      correct_picks: entry.correctPicks,
+      total_completed_matches: entry.totalCompletedMatches
+    });
+    if (!error) void loadSharedLeaderboard();
   }
 
   function openTeamPredictions(team: string) {
@@ -1584,20 +1659,18 @@ export default function Home() {
 
   function chooseManualWinner(matchId: number, winner: string) {
     if (isCompletedKnockoutMatch(matchId)) return;
-    if (matchId === 104) saveLeaderboardResult(winner);
     const dependentIds = nextRounds.filter(([, a, b]) => a === matchId || b === matchId).map(([id]) => id);
-    setManualWinners((previous) => {
-      const next = { ...previous, [matchId]: winner };
-      function clearDownstream(ids: number[]) {
-        ids.forEach((id) => {
-          delete next[id];
-          const more = nextRounds.filter(([, a, b]) => a === id || b === id).map(([nextId]) => nextId);
-          clearDownstream(more);
-        });
-      }
-      clearDownstream(dependentIds);
-      return next;
-    });
+    const next = { ...manualWinners, [matchId]: winner };
+    function clearDownstream(ids: number[]) {
+      ids.forEach((id) => {
+        delete next[id];
+        const more = nextRounds.filter(([, a, b]) => a === id || b === id).map(([nextId]) => nextId);
+        clearDownstream(more);
+      });
+    }
+    clearDownstream(dependentIds);
+    setManualWinners(next);
+    if (matchId === 104) void saveLeaderboardResult(winner, next);
   }
 
   function ratingMetric(name: string, metric: "attack" | "defense" | "form" | "momentum") {
@@ -2031,9 +2104,11 @@ export default function Home() {
           <div className="team-hub-list">
             {leaderboard.length === 0 && <p className="step">No predictions yet.</p>}
             {leaderboard.map((entry, index) => (
-              <button key={`${entry.name}-${entry.champion}-${entry.createdAt}`} type="button" disabled>
-                <span>{index + 1}. {entry.name}</span>
+              <button className={`leaderboard-row rank-${index + 1}`} key={`${entry.name}-${entry.champion}-${entry.createdAt}`} type="button" disabled>
+                <span>#{index + 1}</span>
+                <strong>{entry.name}</strong>
                 <em>{flag(entry.champion)} {entry.champion}</em>
+                <b>{entry.correctPicks}/{entry.totalCompletedMatches}</b>
               </button>
             ))}
           </div>

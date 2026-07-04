@@ -633,6 +633,32 @@ h2 {
   font-weight: 1000;
 }
 
+.team-hub-list .leaderboard-row {
+  grid-template-columns: 44px minmax(0, 1fr) minmax(0, 1fr) auto;
+  text-align: left;
+}
+
+.team-hub-list .leaderboard-row strong,
+.team-hub-list .leaderboard-row b {
+  min-width: 0;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.team-hub-list .leaderboard-row.rank-1 {
+  background: linear-gradient(135deg, rgba(4, 80, 43, 0.95), rgba(7, 132, 75, 0.72));
+}
+
+.team-hub-list .leaderboard-row.rank-2 {
+  background: linear-gradient(135deg, rgba(18, 129, 76, 0.9), rgba(24, 159, 96, 0.62));
+}
+
+.team-hub-list .leaderboard-row.rank-3 {
+  background: linear-gradient(135deg, rgba(75, 190, 122, 0.78), rgba(125, 220, 154, 0.48));
+}
+
 .team-shortcuts > div {
   display: flex;
   flex-wrap: wrap;

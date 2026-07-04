@@ -6,10 +6,11 @@
     "check:routing": "node work/verify-routing.js"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.110.0",
+    "lucide-react": "latest",
     "next": "latest",
     "react": "latest",
-    "react-dom": "latest",
-    "lucide-react": "latest"
+    "react-dom": "latest"
   },
   "devDependencies": {
     "@types/node": "latest",
