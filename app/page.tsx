@@ -11,7 +11,7 @@ type Standing = Team & { played: number; won: number; drawn: number; lost: numbe
 type Slot = { source: string; team: string };
 type Match = { id: number; home: string; away: string; homeSource: string; awaySource: string; hs: number; as: number; winner: string; label: string };
 type RoundOneResult = { group: string; teamA: string; teamB: string; scoreA: number; scoreB: number };
-type CompletedKnockoutResult = { id: number; home: string; away: string; winner: string };
+type CompletedKnockoutResult = { id: number; home: string; away: string; scoreA: number; scoreB: number; penaltyScoreA?: number; penaltyScoreB?: number; winner: string };
 type LeaderboardEntry = { name: string; champion: string; createdAt: string };
 type CurrentRealGroupStanding = {
   team: string;
@@ -104,13 +104,28 @@ const officialRoundOf32Mapping = [
 ] as const;
 
 const nextRounds = [
-  [89, 73, 75], [90, 74, 77], [91, 76, 78], [92, 79, 80],
+  [89, 74, 77], [90, 73, 75], [91, 76, 78], [92, 79, 80],
   [93, 83, 84], [94, 81, 82], [95, 86, 88], [96, 85, 87],
   [97, 89, 90], [98, 93, 94], [99, 91, 92], [100, 95, 96],
   [101, 97, 98], [102, 99, 100], [103, 101, 102], [104, 101, 102]
 ] as const;
 const COMPLETED_KNOCKOUT_RESULTS: CompletedKnockoutResult[] = [
-  { id: 87, home: "Colombia", away: "Ghana", winner: "Colombia" }
+  { id: 73, home: "South Africa", away: "Canada", scoreA: 0, scoreB: 1, winner: "Canada" },
+  { id: 74, home: "Germany", away: "Paraguay", scoreA: 1, scoreB: 1, penaltyScoreA: 3, penaltyScoreB: 4, winner: "Paraguay" },
+  { id: 75, home: "Netherlands", away: "Morocco", scoreA: 1, scoreB: 1, penaltyScoreA: 2, penaltyScoreB: 3, winner: "Morocco" },
+  { id: 76, home: "Brazil", away: "Japan", scoreA: 2, scoreB: 1, winner: "Brazil" },
+  { id: 77, home: "France", away: "Sweden", scoreA: 3, scoreB: 0, winner: "France" },
+  { id: 78, home: "Ivory Coast", away: "Norway", scoreA: 1, scoreB: 2, winner: "Norway" },
+  { id: 79, home: "Mexico", away: "Ecuador", scoreA: 2, scoreB: 0, winner: "Mexico" },
+  { id: 80, home: "England", away: "DR Congo", scoreA: 2, scoreB: 1, winner: "England" },
+  { id: 81, home: "United States", away: "Bosnia and Herzegovina", scoreA: 2, scoreB: 0, winner: "United States" },
+  { id: 82, home: "Belgium", away: "Senegal", scoreA: 3, scoreB: 2, winner: "Belgium" },
+  { id: 83, home: "Portugal", away: "Croatia", scoreA: 2, scoreB: 1, winner: "Portugal" },
+  { id: 84, home: "Spain", away: "Austria", scoreA: 3, scoreB: 0, winner: "Spain" },
+  { id: 85, home: "Switzerland", away: "Algeria", scoreA: 2, scoreB: 0, winner: "Switzerland" },
+  { id: 86, home: "Argentina", away: "Cape Verde", scoreA: 3, scoreB: 2, winner: "Argentina" },
+  { id: 87, home: "Colombia", away: "Ghana", scoreA: 1, scoreB: 0, winner: "Colombia" },
+  { id: 88, home: "Australia", away: "Egypt", scoreA: 1, scoreB: 1, penaltyScoreA: 2, penaltyScoreB: 4, winner: "Egypt" }
 ];
 const completedKnockoutResultMap = new Map(COMPLETED_KNOCKOUT_RESULTS.map((match) => [match.id, match]));
 
@@ -213,7 +228,7 @@ const mobileBracketStages = [
 const bracketRows = new Map<number, { row: number; span: number }>([
   [73, { row: 1, span: 2 }], [75, { row: 3, span: 2 }], [74, { row: 5, span: 2 }], [77, { row: 7, span: 2 }],
   [83, { row: 9, span: 2 }], [84, { row: 11, span: 2 }], [81, { row: 13, span: 2 }], [82, { row: 15, span: 2 }],
-  [89, { row: 2, span: 2 }], [90, { row: 6, span: 2 }], [93, { row: 10, span: 2 }], [94, { row: 14, span: 2 }],
+  [90, { row: 2, span: 2 }], [89, { row: 6, span: 2 }], [93, { row: 10, span: 2 }], [94, { row: 14, span: 2 }],
   [97, { row: 4, span: 2 }], [98, { row: 12, span: 2 }], [101, { row: 8, span: 2 }],
   [76, { row: 1, span: 2 }], [78, { row: 3, span: 2 }], [79, { row: 5, span: 2 }], [80, { row: 7, span: 2 }],
   [86, { row: 9, span: 2 }], [88, { row: 11, span: 2 }], [85, { row: 13, span: 2 }], [87, { row: 15, span: 2 }],
@@ -391,15 +406,14 @@ function completedKnockoutWinner(matchId: number) {
 function applyCompletedKnockoutResults(matches: Map<number, Match>) {
   COMPLETED_KNOCKOUT_RESULTS.forEach((completed) => {
     const existing = matches.get(completed.id);
-    const winnerIsHome = completed.winner === completed.home;
     matches.set(completed.id, {
       id: completed.id,
       home: completed.home,
       away: completed.away,
       homeSource: existing?.homeSource || "1K",
       awaySource: existing?.awaySource || "3DEIJL",
-      hs: winnerIsHome ? 1 : 0,
-      as: winnerIsHome ? 0 : 1,
+      hs: completed.scoreA,
+      as: completed.scoreB,
       winner: completed.winner,
       label: `M${completed.id}`
     });
@@ -1696,10 +1710,11 @@ export default function Home() {
         <span>{tr(t.matchNumber, { number: String(match.id) })}</span>
         {(["home", "away"] as const).map((side) => {
           const name = match[side];
+          const state = winner === name ? "winner" : winner ? "loser" : "";
           return (
             <button
               type="button"
-              className={winner === name ? "bracket-team winner" : "bracket-team"}
+              className={`bracket-team ${state}`}
               key={side}
               onClick={() => name && match.ready && chooseManualWinner(match.id, name)}
               disabled={!name || !match.ready || completed}
