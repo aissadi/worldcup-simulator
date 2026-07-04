@@ -4,13 +4,15 @@ import { ChevronLeft, House, Share2, Sparkles, Trophy, Volume2, Zap } from "luci
 import { type CSSProperties, type ReactNode, type TouchEvent, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { languageOptions, locales, type LocaleCode } from "../locales";
 
-type Phase = "home" | "fullIntro" | "tournamentGroup" | "groupSelect" | "groupReveal" | "bestThirds" | "matchSelect" | "predictor" | "knockout" | "roundSet" | "championDecision" | "champion" | "builderGroup" | "builderThirds" | "builderBracket";
+type Phase = "home" | "leaderboard" | "fullIntro" | "tournamentGroup" | "groupSelect" | "groupReveal" | "bestThirds" | "matchSelect" | "predictor" | "knockout" | "roundSet" | "championDecision" | "champion" | "builderGroup" | "builderThirds" | "builderBracket";
 type Team = { name: string; rating: number; group: string; flag: string; code?: string };
 type Group = { id: string; teams: Team[] };
 type Standing = Team & { played: number; won: number; drawn: number; lost: number; gf: number; ga: number; gd: number; points: number };
 type Slot = { source: string; team: string };
 type Match = { id: number; home: string; away: string; homeSource: string; awaySource: string; hs: number; as: number; winner: string; label: string };
 type RoundOneResult = { group: string; teamA: string; teamB: string; scoreA: number; scoreB: number };
+type CompletedKnockoutResult = { id: number; home: string; away: string; winner: string };
+type LeaderboardEntry = { name: string; champion: string; createdAt: string };
 type CurrentRealGroupStanding = {
   team: string;
   group: string;
@@ -107,6 +109,10 @@ const nextRounds = [
   [97, 89, 90], [98, 93, 94], [99, 91, 92], [100, 95, 96],
   [101, 97, 98], [102, 99, 100], [103, 101, 102], [104, 101, 102]
 ] as const;
+const COMPLETED_KNOCKOUT_RESULTS: CompletedKnockoutResult[] = [
+  { id: 87, home: "Colombia", away: "Ghana", winner: "Colombia" }
+];
+const completedKnockoutResultMap = new Map(COMPLETED_KNOCKOUT_RESULTS.map((match) => [match.id, match]));
 
 const groupFixtures = [[0, 1], [2, 3], [0, 2], [1, 3], [0, 3], [1, 2]];
 const COMPLETED_GROUP_RESULTS: RoundOneResult[] = [
@@ -374,6 +380,32 @@ function loser(match: Match) {
   return match.winner === match.home ? match.away : match.home;
 }
 
+function isCompletedKnockoutMatch(matchId: number) {
+  return completedKnockoutResultMap.has(matchId);
+}
+
+function completedKnockoutWinner(matchId: number) {
+  return completedKnockoutResultMap.get(matchId)?.winner;
+}
+
+function applyCompletedKnockoutResults(matches: Map<number, Match>) {
+  COMPLETED_KNOCKOUT_RESULTS.forEach((completed) => {
+    const existing = matches.get(completed.id);
+    const winnerIsHome = completed.winner === completed.home;
+    matches.set(completed.id, {
+      id: completed.id,
+      home: completed.home,
+      away: completed.away,
+      homeSource: existing?.homeSource || "1K",
+      awaySource: existing?.awaySource || "3DEIJL",
+      hs: winnerIsHome ? 1 : 0,
+      as: winnerIsHome ? 0 : 1,
+      winner: completed.winner,
+      label: `M${completed.id}`
+    });
+  });
+}
+
 function assignThirdPlaceSlots(bestThirds: Standing[]) {
   const thirdGroups = new Set(bestThirds.map((team) => team.group));
   const thirdSlots = fixedR32
@@ -457,6 +489,7 @@ function simulate(seed: number) {
 
   const matches = new Map<number, Match>();
   fixedR32.forEach(([id, a, b]) => matches.set(id, knockout(resolve(a), resolve(b), teams, id, rng)));
+  applyCompletedKnockoutResults(matches);
   nextRounds.forEach(([id, a, b]) => {
     const isThirdPlace = id === 103;
     const ma = matches.get(a)!;
@@ -482,6 +515,7 @@ function buildRealTournamentFromStandings(seed: number, standings: CurrentRealGr
     const id = Number(fixture.id.slice(1));
     matches.set(id, knockout(fixture.teamA, fixture.teamB, teams, id, rng));
   });
+  applyCompletedKnockoutResults(matches);
 
   nextRounds.forEach(([id, a, b]) => {
     const isThirdPlace = id === 103;
@@ -591,6 +625,55 @@ function buildManualMatches(picks: Record<string, BuilderPick>, thirdGroups: str
       winner: winners[id],
       label: `M${id}`,
       ready: Boolean(home && away)
+    });
+  });
+
+  return manualMatches;
+}
+
+function buildManualKnockoutMatches(knockoutMatches: Match[], winners: Record<number, string>) {
+  const sourceMatches = new Map(knockoutMatches.map((match) => [match.id, match]));
+  const manualMatches = new Map<number, ManualMatch>();
+  const selectedWinner = (matchId: number) => completedKnockoutWinner(matchId) || winners[matchId];
+
+  knockoutMatches
+    .filter((match) => match.id <= 88)
+    .forEach((match) => {
+      manualMatches.set(match.id, {
+        id: match.id,
+        home: match.home,
+        away: match.away,
+        homeSource: match.homeSource,
+        awaySource: match.awaySource,
+        winner: selectedWinner(match.id),
+        label: match.label,
+        ready: true
+      });
+    });
+
+  nextRounds.forEach(([id, a, b]) => {
+    const first = manualMatches.get(a);
+    const second = manualMatches.get(b);
+    const firstWinner = selectedWinner(a);
+    const secondWinner = selectedWinner(b);
+    const firstSource = sourceMatches.get(a);
+    const secondSource = sourceMatches.get(b);
+    const thirdPlace = id === 103;
+    const home = thirdPlace && firstWinner && first
+      ? (firstWinner === first.home ? first.away : first.home)
+      : firstWinner;
+    const away = thirdPlace && secondWinner && second
+      ? (secondWinner === second.home ? second.away : second.home)
+      : secondWinner;
+    manualMatches.set(id, {
+      id,
+      home,
+      away,
+      homeSource: `${thirdPlace ? "L" : "W"}${a}`,
+      awaySource: `${thirdPlace ? "L" : "W"}${b}`,
+      winner: selectedWinner(id),
+      label: sourceMatches.get(id)?.label || `M${id}`,
+      ready: Boolean(home && away && (firstSource || first) && (secondSource || second))
     });
   });
 
@@ -721,6 +804,9 @@ export default function Home() {
   const [builderThirdGroups, setBuilderThirdGroups] = useState<string[]>([]);
   const [manualWinners, setManualWinners] = useState<Record<number, string>>({});
   const [builderWarning, setBuilderWarning] = useState("");
+  const [playerName, setPlayerName] = useState("");
+  const [nameWarning, setNameWarning] = useState("");
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [matchTeamFilter, setMatchTeamFilter] = useState("");
   const [selectedTeam, setSelectedTeam] = useState("");
   const [teamSearch, setTeamSearch] = useState("");
@@ -782,7 +868,9 @@ export default function Home() {
   const champion = result.champion;
   const thirdQualified = new Set(result.bestThirds.map((item) => item.name));
   const matchById = new Map(knockoutMatches.map((match, index) => [match.id, { match, index }]));
-  const manualMatches = buildManualMatches(builderPicks, builderThirdGroups, manualWinners);
+  const manualMatches = phase === "builderBracket" && Object.keys(builderPicks).length === 0
+    ? buildManualKnockoutMatches(knockoutMatches, manualWinners)
+    : buildManualMatches(builderPicks, builderThirdGroups, manualWinners);
   const manualChampion = manualWinners[104];
   const displayChampion = flow === "manual" && manualChampion ? manualChampion : champion;
 
@@ -791,6 +879,17 @@ export default function Home() {
     if (saved && saved in locales) setLanguage(saved);
     const savedTeam = window.localStorage.getItem("worldcup-selected-team");
     if (savedTeam && allTeams.some((item) => item.name === savedTeam)) setSelectedTeam(savedTeam);
+    const savedName = window.localStorage.getItem("worldcup-player-name");
+    if (savedName) setPlayerName(savedName);
+    const savedLeaderboard = window.localStorage.getItem("worldcup-leaderboard");
+    if (savedLeaderboard) {
+      try {
+        const entries = JSON.parse(savedLeaderboard) as LeaderboardEntry[];
+        if (Array.isArray(entries)) setLeaderboard(entries);
+      } catch {
+        setLeaderboard([]);
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -806,6 +905,14 @@ export default function Home() {
     }
     window.localStorage.removeItem("worldcup-selected-team");
   }, [selectedTeam]);
+
+  useEffect(() => {
+    if (playerName.trim()) window.localStorage.setItem("worldcup-player-name", playerName.trim());
+  }, [playerName]);
+
+  useEffect(() => {
+    window.localStorage.setItem("worldcup-leaderboard", JSON.stringify(leaderboard));
+  }, [leaderboard]);
 
   useEffect(() => {
     pinchZoomRef.current = bracketZoom;
@@ -1086,6 +1193,32 @@ export default function Home() {
       setBuilderWarning("");
       setPhase("builderGroup");
     }
+  }
+
+  function startBracketPrediction() {
+    const cleanName = playerName.trim();
+    if (!cleanName) {
+      setNameWarning("Enter your name to start.");
+      return;
+    }
+    window.localStorage.setItem("worldcup-player-name", cleanName);
+    setNameWarning("");
+    setFlow("manual");
+    setBuilderGroupIndex(0);
+    setBuilderPicks({});
+    setBuilderThirdGroups([]);
+    setManualWinners(Object.fromEntries(COMPLETED_KNOCKOUT_RESULTS.map((match) => [match.id, match.winner])));
+    setBuilderWarning("");
+    setPhase("builderBracket");
+  }
+
+  function saveLeaderboardResult(championName: string) {
+    const cleanName = playerName.trim();
+    if (!cleanName) return;
+    setLeaderboard((previous) => [
+      { name: cleanName, champion: championName, createdAt: new Date().toISOString() },
+      ...previous.filter((entry) => !(entry.name === cleanName && entry.champion === championName)).slice(0, 19)
+    ]);
   }
 
   function openTeamPredictions(team: string) {
@@ -1380,10 +1513,11 @@ export default function Home() {
   function isKnockoutMatchAvailable(matchId: number) {
     if (matchId <= 88) return true;
     const dependencies = dependencyByMatch.get(matchId);
-    return dependencies ? dependencies.every((id) => revealedMatchIds.has(id)) : false;
+    return dependencies ? dependencies.every((id) => revealedMatchIds.has(id) || isCompletedKnockoutMatch(id)) : false;
   }
 
   function openKnockoutMatch(matchId: number) {
+    if (isCompletedKnockoutMatch(matchId)) return;
     const item = matchById.get(matchId);
     if (!item || !isKnockoutMatchAvailable(matchId)) return;
     openPredictor(item.index, "knockout");
@@ -1435,6 +1569,8 @@ export default function Home() {
   }
 
   function chooseManualWinner(matchId: number, winner: string) {
+    if (isCompletedKnockoutMatch(matchId)) return;
+    if (matchId === 104) saveLeaderboardResult(winner);
     const dependentIds = nextRounds.filter(([, a, b]) => a === matchId || b === matchId).map(([id]) => id);
     setManualWinners((previous) => {
       const next = { ...previous, [matchId]: winner };
@@ -1492,7 +1628,8 @@ export default function Home() {
     if (!item) return null;
     const match = item.match;
     const available = isKnockoutMatchAvailable(matchId);
-    const revealed = revealedMatchIds.has(matchId);
+    const completed = isCompletedKnockoutMatch(matchId);
+    const revealed = revealedMatchIds.has(matchId) || completed;
     const isFocusActive = flow === "full" && phase === "knockout" && ["loading", "winner", "championDecision"].includes(autoKnockoutStatus);
     const isCurrent = isFocusActive && currentMatch?.id === matchId;
     const homeName = sourceLabel(matchId, "home");
@@ -1504,10 +1641,10 @@ export default function Home() {
     return (
       <button
         type="button"
-        className={`${compact ? "bracket-card compact" : "bracket-card"} ${revealed ? "revealed" : ""} ${isCurrent ? "current-reveal" : ""} ${followsSelectedTeam ? "team-path" : ""} ${available ? "" : "locked"}`}
+        className={`${compact ? "bracket-card compact" : "bracket-card"} ${revealed ? "revealed" : ""} ${completed ? "locked-result" : ""} ${isCurrent ? "current-reveal" : ""} ${followsSelectedTeam ? "team-path" : ""} ${available ? "" : "locked"}`}
         style={placement ? { gridRow: `${placement.row} / span ${placement.span}` } : undefined}
         onClick={() => openKnockoutMatch(matchId)}
-        disabled={!available}
+        disabled={!available || completed}
       >
         <span>{tr(t.matchNumber, { number: String(match.id) })}</span>
         <div className={`bracket-team ${homeState}`}>
@@ -1550,9 +1687,10 @@ export default function Home() {
     if (!match) return null;
     const placement = bracketRows.get(matchId);
     const winner = match.winner;
+    const completed = isCompletedKnockoutMatch(matchId);
     return (
       <div
-        className={`${compact ? "bracket-card manual compact" : "bracket-card manual"} ${winner ? "revealed" : ""}`}
+        className={`${compact ? "bracket-card manual compact" : "bracket-card manual"} ${winner ? "revealed" : ""} ${completed ? "locked-result" : ""}`}
         style={placement ? { gridRow: `${placement.row} / span ${placement.span}` } : undefined}
       >
         <span>{tr(t.matchNumber, { number: String(match.id) })}</span>
@@ -1564,14 +1702,14 @@ export default function Home() {
               className={winner === name ? "bracket-team winner" : "bracket-team"}
               key={side}
               onClick={() => name && match.ready && chooseManualWinner(match.id, name)}
-              disabled={!name || !match.ready}
+              disabled={!name || !match.ready || completed}
             >
               {name ? flag(name) : <i />}
               <strong>{name || (side === "home" ? match.homeSource : match.awaySource)}</strong>
             </button>
           );
         })}
-        <small>{winner ? `${t.winner}: ${winner}` : match.ready ? t.tapWinner : t.locked}</small>
+        <small>{completed ? "Locked result" : winner ? `${t.winner}: ${winner}` : match.ready ? t.tapWinner : t.locked}</small>
         {winner && <span className="advance-chip">{flag(winner)} {t.advance}</span>}
       </div>
     );
@@ -1595,7 +1733,8 @@ export default function Home() {
   function MobileKnockoutCard({ matchId }: { matchId: number }) {
     const match = matchById.get(matchId)?.match;
     const available = isKnockoutMatchAvailable(matchId);
-    const revealed = revealedMatchIds.has(matchId);
+    const completed = isCompletedKnockoutMatch(matchId);
+    const revealed = revealedMatchIds.has(matchId) || completed;
     const isFocusActive = flow === "full" && phase === "knockout" && ["loading", "winner", "championDecision"].includes(autoKnockoutStatus);
     const isCurrent = isFocusActive && currentMatch?.id === matchId;
     const homeName = available && match ? match.home : "";
@@ -1605,9 +1744,9 @@ export default function Home() {
     return (
       <button
         type="button"
-        className={`mobile-match-card ${revealed ? "revealed" : ""} ${isCurrent ? "current-reveal" : ""} ${followsSelectedTeam ? "team-path" : ""} ${available ? "" : "locked"}`}
+        className={`mobile-match-card ${revealed ? "revealed" : ""} ${completed ? "locked-result" : ""} ${isCurrent ? "current-reveal" : ""} ${followsSelectedTeam ? "team-path" : ""} ${available ? "" : "locked"}`}
         onClick={() => openKnockoutMatch(matchId)}
-        disabled={!available}
+        disabled={!available || completed}
         aria-label={available ? `${tr(t.matchNumber, { number: String(matchId) })}: ${homeName} ${t.versus} ${awayName}` : `${tr(t.matchNumber, { number: String(matchId) })} ${t.locked}`}
       >
         <span>{`M${matchId}`}</span>
@@ -1624,10 +1763,11 @@ export default function Home() {
   function MobileManualKnockoutCard({ matchId }: { matchId: number }) {
     const match = manualMatches.get(matchId);
     if (!match) return null;
+    const completed = isCompletedKnockoutMatch(matchId);
 
     return (
       <div
-        className={`mobile-match-card manual ${match.winner ? "revealed" : ""}`}
+        className={`mobile-match-card manual ${match.winner ? "revealed" : ""} ${completed ? "locked-result" : ""}`}
         aria-label={`${tr(t.matchNumber, { number: String(matchId) })}: ${match.home || match.homeSource} ${t.versus} ${match.away || match.awaySource}`}
       >
         <span>{`M${matchId}`}</span>
@@ -1640,7 +1780,7 @@ export default function Home() {
               className={`mobile-flag-row ${state}`}
               key={side}
               onClick={() => name && match.ready && chooseManualWinner(matchId, name)}
-              disabled={!name || !match.ready}
+              disabled={!name || !match.ready || completed}
               aria-label={name ? `${t.winner}: ${name}` : t.locked}
             >
               {name ? flag(name) : <i />}
@@ -1744,8 +1884,30 @@ export default function Home() {
       {phase === "champion" && <div className="confetti" aria-hidden="true"><i /><i /><i /><i /><i /><i /><i /><i /></div>}
 
       {phase === "home" && (
-        <section className="screen landing" style={{ alignItems: "center", textAlign: "center" }}>
+        <section className="screen landing simplified-home" style={{ alignItems: "center", textAlign: "center" }}>
           <div className="landing-atmosphere" aria-hidden="true"><i /><i /><i /></div>
+          <div className="knockout-home">
+            <div className="landing-trophy" style={{ marginLeft: "auto", marginRight: "auto" }}>
+              <img className="landing-logo" src="/worldcup-2026-logo.png" alt={t.logoAlt} />
+            </div>
+            <h1 style={{ textAlign: "center" }}><span>Predict Your</span><span>World Cup Champion</span></h1>
+            <section className="team-selector-panel" style={{ width: "100%", maxWidth: 520, marginLeft: "auto", marginRight: "auto", textAlign: "center" }}>
+              <label className="team-search">
+                <span>Name</span>
+                <input
+                  value={playerName}
+                  onChange={(event) => { setPlayerName(event.target.value); setNameWarning(""); }}
+                  placeholder="Enter your name"
+                />
+              </label>
+              {nameWarning && <p className="builder-warning">{nameWarning}</p>}
+              <button className="quick-predict" onClick={startBracketPrediction} style={{ alignSelf: "center" }}>
+                <Sparkles size={22} />
+                <span>Start Prediction</span>
+              </button>
+              <button className="secondary" onClick={() => setPhase("leaderboard")}>View Leaderboard</button>
+            </section>
+          </div>
           <div className="landing-trophy" style={{ marginLeft: "auto", marginRight: "auto" }}>
             <img className="landing-logo" src="/worldcup-2026-logo.png" alt={t.logoAlt} />
             <Trophy size={68} />
@@ -1843,6 +2005,23 @@ export default function Home() {
               </button>
             </section>
           )}
+        </section>
+      )}
+
+      {phase === "leaderboard" && (
+        <section className="screen">
+          <button className="back" onClick={() => setPhase("home")}><ChevronLeft size={18} /> {t.back}</button>
+          <p className="kicker">Leaderboard</p>
+          <h2>Champion Picks</h2>
+          <div className="team-hub-list">
+            {leaderboard.length === 0 && <p className="step">No predictions yet.</p>}
+            {leaderboard.map((entry, index) => (
+              <button key={`${entry.name}-${entry.champion}-${entry.createdAt}`} type="button" disabled>
+                <span>{index + 1}. {entry.name}</span>
+                <em>{flag(entry.champion)} {entry.champion}</em>
+              </button>
+            ))}
+          </div>
         </section>
       )}
 

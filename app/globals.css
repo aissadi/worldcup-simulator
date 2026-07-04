@@ -346,6 +346,18 @@ h2 {
   width: 100%;
 }
 
+.simplified-home > :not(.landing-atmosphere):not(.knockout-home) {
+  display: none !important;
+}
+
+.knockout-home {
+  width: 100%;
+  max-width: 560px;
+  display: grid;
+  justify-items: center;
+  gap: 22px;
+}
+
 .quick-predict {
   width: min(100%, 390px);
   min-height: 68px;
@@ -1408,6 +1420,13 @@ h2 {
 .mobile-match-card.locked {
   opacity: 0.58;
   filter: saturate(0.75);
+}
+
+.bracket-card.locked-result,
+.mobile-match-card.locked-result {
+  cursor: default;
+  border-color: rgba(248, 200, 78, 0.72);
+  box-shadow: 0 0 22px rgba(248, 200, 78, 0.22);
 }
 
 .bracket-card.revealed {
